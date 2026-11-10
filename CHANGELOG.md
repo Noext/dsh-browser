@@ -2,6 +2,16 @@
 
 ## 0.2.2
 
+### Changed
+
+- Releases publish from GitHub Actions through npm Trusted Publishing (OIDC).
+  npm removed the tokens that bypassed 2FA, so a long-lived token can no longer
+  publish; the workflow verifies the committed `lib/` matches a fresh build and
+  attaches provenance to the tarball.
+- `npm run typecheck` uses `tsconfig.dev.json`, which points at a sibling DSH
+  checkout. The plain `tsconfig.json` no longer carries machine-specific paths.
+
+
 ### Fixed
 
 - **Clicks landed away from the pointer.** The canvas kept the previous frame's

@@ -45,7 +45,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.dev.json",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "prepublishOnly": "node scripts/build.mjs"
   },

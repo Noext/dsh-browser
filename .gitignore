@@ -2,3 +2,5 @@ node_modules/
 .dsh-browser-profile/
 tests/shots/
 *.log
+# Points at a sibling DSH checkout; only present on a maintainer's machine.
+tsconfig.dev.json

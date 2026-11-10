@@ -139,6 +139,21 @@ tool can reach anything Chromium can reach. Treat `browser_*` like shell access.
   refuses to start otherwise; the profile directory, not the renderer sandbox, is
   the isolation boundary here.
 
+## Releasing
+
+Publishing goes through GitHub Actions and npm **Trusted Publishing**, so no npm
+token exists in this repository or on anyone's machine:
+
+1. Bump `version` and add a CHANGELOG entry.
+2. Run `node scripts/build.mjs` and commit the rebuilt `lib/`; the workflow
+   refuses to publish when the committed artifacts differ from a fresh build.
+3. Tag and push: `git tag -a v0.2.3 -m "..." && git push origin main --follow-tags`.
+
+The tag starts the workflow, which builds, tests, and publishes with provenance.
+One-time setup on npmjs.com: the package's **Settings → Trusted Publisher** must
+name this repository and `release.yml`. npm removed the tokens that bypassed 2FA,
+so a long-lived token can no longer publish.
+
 ## Updating
 
 From npm, use the **Update** button on the Plugins page, or:
