@@ -38,6 +38,8 @@ export interface StatusPayload {
   /** Present while the Agent is waiting for a human action. */
   readonly request: { readonly reason: string; readonly startedAt: number } | undefined
   readonly profile: 'persistent' | 'ephemeral'
+  /** Windows currently mirroring this browser; idle reclamation needs zero. */
+  readonly watching: number
   readonly runs: { readonly active: number; readonly max: number }
 }
 

@@ -105,6 +105,7 @@ export function apply(ctx: Context, config: Config): void {
       viewport: snapshot.viewport,
       request: entry.session.pendingRequest,
       profile: config.persistentProfile ? 'persistent' : 'ephemeral',
+      watching: viewers.get(agentId)?.size ?? 0,
       runs: { active: entries.size, max: config.maxSessions },
     }
   }
@@ -231,7 +232,7 @@ export function apply(ctx: Context, config: Config): void {
       async fetch(request) {
         const agentId = new URL(request.url).searchParams.get('agentId') ?? ''
         const status = statusFor(agentId)
-        if (status === undefined) return Response.json({ protocol: 1, state: 'idle', views: [], runs: { active: 0, max: config.maxSessions } })
+        if (status === undefined) return Response.json({ protocol: 1, state: 'idle', views: [], watching: 0, runs: { active: 0, max: config.maxSessions } })
         return Response.json(status)
       },
     }), 'dsh-browser: status route')

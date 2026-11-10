@@ -95,6 +95,9 @@ export class BrowserSession {
   /** Why the session failed, when it did. */
   get error(): string | undefined { return this.failure }
 
+  /** How many windows are mirroring this browser right now. */
+  get watchers(): number { return this.viewers }
+
   /** The Agent's outstanding request for human help, if any. */
   get pendingRequest(): { reason: string; startedAt: number } | undefined { return this.request }
 
