@@ -70,6 +70,9 @@ interface Entry {
   disposal: (() => void) | undefined
 }
 
+/** Version of this build, stamped at build time. */
+const VERSION = typeof __DSH_BROWSER_VERSION__ === 'string' ? __DSH_BROWSER_VERSION__ : 'development'
+
 /** Host plugin. */
 export function apply(ctx: Context, config: Config): void {
   const log = {
@@ -78,6 +81,7 @@ export function apply(ctx: Context, config: Config): void {
     warn: (message: string, error?: unknown) => { ctx.logger.warn(message, error) },
     error: (message: string, error?: unknown) => { ctx.logger.error(message, error) },
   }
+  log.info(`dsh-browser ${VERSION} starting`)
   const executablePath = config.executablePath ?? discoverExecutable()
   if (executablePath === undefined) {
     log.warn('no Chromium executable found; dsh-browser stays inert until one is configured')
@@ -97,6 +101,7 @@ export function apply(ctx: Context, config: Config): void {
     const snapshot = entry.session.snapshot()
     return {
       protocol: 1,
+      version: VERSION,
       state: snapshot.lease.state,
       holder: snapshot.lease.holder,
       leaseExpiresAt: snapshot.lease.expiresAt,
@@ -232,7 +237,7 @@ export function apply(ctx: Context, config: Config): void {
       async fetch(request) {
         const agentId = new URL(request.url).searchParams.get('agentId') ?? ''
         const status = statusFor(agentId)
-        if (status === undefined) return Response.json({ protocol: 1, state: 'idle', views: [], watching: 0, runs: { active: 0, max: config.maxSessions } })
+        if (status === undefined) return Response.json({ protocol: 1, version: VERSION, state: 'idle', views: [], watching: 0, runs: { active: 0, max: config.maxSessions } })
         return Response.json(status)
       },
     }), 'dsh-browser: status route')

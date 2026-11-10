@@ -1,6 +1,6 @@
 {
   "name": "dsh-browser",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A real Chromium in the DSH right sidebar: the agent drives it, and you can take over to sign in.",
   "type": "module",
   "main": "lib/index.js",
@@ -27,7 +27,8 @@
     "lib/client.js",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {

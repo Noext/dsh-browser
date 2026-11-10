@@ -30,6 +30,13 @@ Chromium is discovered from `DSH_BROWSER_EXECUTABLE`, then Playwright's cache
 (`npx playwright install chromium`), then common system paths. Set
 `executablePath` to pin it.
 
+## Version
+
+`GET /api/dsh-browser/status` reports the running build's `version`, and the
+Host logs `dsh-browser <version> starting` on activation — so an installed copy
+can be checked without reading the package on disk. Releases before `0.2.0` were
+never tagged; see [CHANGELOG.md](CHANGELOG.md).
+
 ## Configuration
 
 | Field | Default | Meaning |

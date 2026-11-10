@@ -29,6 +29,8 @@ export interface ViewSummary {
 /** The Host's answer to a status poll. */
 export interface StatusPayload {
   readonly protocol: number
+  /** Version of the Host build answering this request. */
+  readonly version: string
   readonly state: ControlState
   readonly holder: 'agent' | 'human' | undefined
   readonly leaseExpiresAt: number | undefined

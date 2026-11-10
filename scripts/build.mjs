@@ -9,9 +9,10 @@
  * package, so this build reproduces it with esbuild.
  */
 import { build } from 'esbuild'
-import { rm, mkdir } from 'node:fs/promises'
+import { rm, mkdir, readFile } from 'node:fs/promises'
 
 const PACKAGE_NAME = 'dsh-browser'
+const { version } = JSON.parse(await readFile('package.json', 'utf8'))
 
 /** Module specifiers the shell shares into its frozen table; everything else is inlined. */
 const EXTERNALS = [
@@ -38,7 +39,10 @@ await build({
   minify: false,
   // DSH packages are provided by the running installation, never vendored here.
   external: ['@deepseek-ai/*', 'ws', 'node:*'],
-  banner: { js: `/** dsh-browser host half */` },
+  // Stamped so a running Host can say which build it loaded, not which
+  // package.json happens to sit next to it on disk.
+  define: { __DSH_BROWSER_VERSION__: JSON.stringify(version) },
+  banner: { js: `/** dsh-browser host half v${version} */` },
 })
 
 // ---- Client half ----
@@ -66,4 +70,4 @@ if (result.errors.length > 0) {
   console.error(result.errors)
   process.exit(1)
 }
-console.log('built lib/index.js and lib/client.js')
+console.log(`built lib/index.js and lib/client.js (v${version})`)
