@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.3
+
+### Fixed
+
+- **The first resize was dropped, so the page kept a padded viewport.** Input
+  frames were only routed after Chromium finished starting, which takes seconds,
+  and the viewer measures the pane during exactly that window. The page stayed at
+  1280×800 inside a 674×897 pane, so the mirror was stretched and every click
+  landed away from the pointer — the search box under the logo. Frames that
+  arrive during startup are now buffered and replayed in order.
+  Measured against a grid fixture: 0 px error at five canvas positions.
+- A second, empty tab no longer opens beside the real one: the tab is created by
+  whichever party needs it first, instead of eagerly at startup.
+
 ## 0.2.2
 
 ### Changed

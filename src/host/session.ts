@@ -381,7 +381,9 @@ export class BrowserSession {
       })
       this.state = 'ready'
       this.startIdleWatch()
-      await this.createView(this.options.initialUrl)
+      // No tab is created here: the viewer that triggered this start creates the
+      // first one, and a tool call creates one when no viewer exists. Creating
+      // one eagerly left every session with an empty second tab.
     } catch (error) {
       this.state = 'failed'
       this.failure = error instanceof Error ? error.message : String(error)

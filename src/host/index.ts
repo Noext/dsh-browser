@@ -15,7 +15,7 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-attachment'
-import { WebSocketServer, type WebSocket } from 'ws'
+import { WebSocketServer, type RawData, type WebSocket } from 'ws'
 import { ControlMachine } from '../shared/control.ts'
 import { FRAME_HEADER_BYTES, FRAME_MAGIC, ROUTE_PROFILE, ROUTE_STATUS, ROUTE_VIEWS, WS_PATH, normalizeAddress, type ClientFrame, type ServerFrame, type StatusPayload } from '../shared/protocol.ts'
 import { discoverExecutable, LaunchError } from './launcher.ts'
@@ -193,12 +193,6 @@ export function apply(ctx: Context, config: Config): void {
       },
     })
     entries.set(agentId, { session, disposal: undefined })
-    // A failed browser must not stay cached: the next attach retries from scratch
-    // instead of answering with a disposed session forever.
-    void session.ensureStarted().catch(() => {
-      const current = entries.get(agentId)
-      if (current?.session === session) entries.delete(agentId)
-    })
     return session
   }
 
@@ -312,11 +306,23 @@ export function apply(ctx: Context, config: Config): void {
       if (agentId === '') { ws.close(4400, 'agentId is required'); return }
       const agent = webCtx.agents.get(agentId as never)
       if (agent === undefined) { ws.close(4404, 'unknown Session'); return }
+      // Frames can arrive while Chromium starts, which takes seconds. Attaching the
+      // listener only after that wait dropped every early resize — the viewer kept
+      // a padded canvas and clicks landed away from the pointer.
+      const early: string[] = []
+      let live = false
+      const onEarly = (raw: RawData): void => { if (!live) early.push(raw.toString()) }
+      ws.on('message', onEarly)
+
       let session: BrowserSession
       try {
         session = sessionFor(agent, agentId)
         await session.attachViewer()
       } catch (error) {
+        // A browser that failed to start must not stay cached, or every later
+        // attach answers from a disposed session instead of retrying. Dropping it
+        // here is safe: this path owns no other reference to it yet.
+        if (entries.get(agentId)?.session === session!) entries.delete(agentId)
         ws.send(JSON.stringify({ t: 'error', code: 'browser/start', message: describe(error) } satisfies ServerFrame))
         ws.close()
         return
@@ -342,6 +348,8 @@ export function apply(ctx: Context, config: Config): void {
         }
       })
       ws.on('error', (error) => { log.debug('viewer socket error', error) })
+      ws.off('message', onEarly)
+      live = true
       ws.on('message', async (raw) => {
         let frame: ClientFrame
         try {
@@ -355,6 +363,12 @@ export function apply(ctx: Context, config: Config): void {
           ws.send(JSON.stringify({ t: 'error', code: 'browser/failed', message: describe(error) } satisfies ServerFrame))
         }
       })
+      // Replay what arrived during startup, in order, once the handler is ready.
+      for (const raw of early) {
+        try {
+          await handleClientFrame(session, ws, JSON.parse(raw) as ClientFrame)
+        } catch { /* a frame that cannot apply is dropped, as it would be live */ }
+      }
     }
 
     const handleClientFrame = async (session: BrowserSession, ws: WebSocket, frame: ClientFrame): Promise<void> => {
