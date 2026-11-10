@@ -10,7 +10,7 @@ import { copy } from './copy.ts'
 /** Tab kind, used by `openTab` callers and the guide. */
 export const TAB_KIND = 'dshbrowser'
 /** Registration identity; must equal the package name so slots dispatch. */
-export const TAB_ID = 'dsh-browser'
+export const TAB_ID = '@noext34/dsh-browser'
 
 /** Build the tab definition. */
 export function tabDefinition(): SidebarRightTabDefinition {

@@ -2,4 +2,4 @@
 # declaration makes the Web app load its ./client bundle as the browser half.
 - insert:
     - id: dsh-browser
-      name: dsh-browser
+      name: '@noext34/dsh-browser'

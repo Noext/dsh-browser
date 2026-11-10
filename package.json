@@ -1,5 +1,5 @@
 {
-  "name": "dsh-browser",
+  "name": "@noext34/dsh-browser",
   "version": "0.2.0",
   "description": "A real Chromium in the DSH right sidebar: the agent drives it, and you can take over to sign in.",
   "type": "module",
@@ -46,7 +46,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "prepublishOnly": "node scripts/build.mjs"
   },
   "dependencies": {
     "ws": "^8.21.3"
@@ -90,5 +91,8 @@
     "cdp",
     "agent",
     "sidebar"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

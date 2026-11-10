@@ -11,7 +11,7 @@
 import { build } from 'esbuild'
 import { rm, mkdir, readFile } from 'node:fs/promises'
 
-const PACKAGE_NAME = 'dsh-browser'
+const PACKAGE_NAME = '@noext34/dsh-browser'
 const { version } = JSON.parse(await readFile('package.json', 'utf8'))
 
 /** Module specifiers the shell shares into its frozen table; everything else is inlined. */

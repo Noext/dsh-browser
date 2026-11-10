@@ -19,12 +19,19 @@ enters the model context, the Session log, or a screenshot.
 ## Install
 
 ```sh
-dsh plugin --profile web add /path/to/dsh-browser
+dsh plugin --profile web add @noext34/dsh-browser
 dsh --profile web
 ```
 
 Open the right sidebar, pick **Browser**, and type an address. Or ask the agent:
 "open example.com and tell me what the page says".
+
+Installing from npm also gives you the **Update** button: the Plugins page lists
+newer published versions and updates in place. A git install does not — DSH only
+offers updates for registry packages.
+
+> The unscoped name `dsh-browser` on npm belongs to an unrelated plugin by
+> another author, so this one is published under the `@noext34` scope.
 
 Chromium is discovered from `DSH_BROWSER_EXECUTABLE`, then Playwright's cache
 (`npx playwright install chromium`), then common system paths. Set
@@ -124,6 +131,18 @@ tool can reach anything Chromium can reach. Treat `browser_*` like shell access.
 - Chromium runs with `--no-sandbox` when the Host runs as root, because Chromium
   refuses to start otherwise; the profile directory, not the renderer sandbox, is
   the isolation boundary here.
+
+## Updating
+
+From npm, use the **Update** button on the Plugins page, or:
+
+```sh
+dsh plugin --profile web update @noext34/dsh-browser
+```
+
+Either way the new code loads when the Host restarts. A Host that has not
+restarted keeps running the previous build; `GET /api/dsh-browser/status`
+reports the version actually in memory, so you can tell the difference.
 
 ## Abandoned browsers
 
