@@ -1,7 +1,7 @@
 /** Geometry: an off-by-one here silently misses every click. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { MIN_VIEWPORT, toPageDelta, toPagePoint, viewportFor } from '../src/shared/geometry.ts'
+import { MIN_VIEWPORT, bitmapSizeFor, toPageDelta, toPagePoint, viewportFor } from '../src/shared/geometry.ts'
 
 const rect = { left: 10, top: 20, width: 640, height: 400 }
 const viewport = { width: 1280, height: 800 }
@@ -29,6 +29,23 @@ test('wheel deltas scale with the viewport', () => {
 test('a pane smaller than the minimum keeps the fallback viewport', () => {
   assert.deepEqual(viewportFor({ width: 100, height: 50 }, viewport), viewport)
   assert.deepEqual(viewportFor({ width: Number.NaN, height: 0 }, viewport), viewport)
+})
+
+test('the bitmap tracks the viewport so the picture is never stretched', () => {
+  // The regression: a canvas left at 1280×800 while the pane showed 674×897
+  // stretched the frame vertically, and every click landed off target.
+  assert.deepEqual(bitmapSizeFor({ width: 674, height: 897 }), { width: 674, height: 897 })
+  assert.deepEqual(bitmapSizeFor({ width: 674, height: 897 }, 2), { width: 1348, height: 1794 })
+})
+
+test('a high pixel ratio is capped, and a nonsense one falls back to 1', () => {
+  assert.deepEqual(bitmapSizeFor({ width: 100, height: 100 }, 3), { width: 200, height: 200 })
+  assert.deepEqual(bitmapSizeFor({ width: 100, height: 100 }, 0), { width: 100, height: 100 })
+  assert.deepEqual(bitmapSizeFor({ width: 100, height: 100 }, Number.NaN), { width: 100, height: 100 })
+})
+
+test('a zero-height viewport never yields a zero-sized bitmap', () => {
+  assert.deepEqual(bitmapSizeFor({ width: 10, height: 0 }), { width: 10, height: 1 })
 })
 
 test('a real pane is used as-is, within the supported range', () => {

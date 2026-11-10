@@ -11,7 +11,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { FRAME_HEADER_BYTES, FRAME_MAGIC, WS_PATH, normalizeAddress } from '../shared/protocol.ts'
 import type { ClientFrame, ControlState, ServerFrame, ViewSummary } from '../shared/protocol.ts'
-import { modifiersOf, toPageDelta, toPagePoint, viewportFor } from '../shared/geometry.ts'
+import { bitmapSizeFor, modifiersOf, toPageDelta, toPagePoint, viewportFor } from '../shared/geometry.ts'
 import { copy } from './copy.ts'
 import { usePluginStyle } from './useStyle.ts'
 
@@ -77,11 +77,11 @@ export function BrowserBody(props: BrowserBodyProps): React.ReactElement {
         if (canvas === null || disposed) return
         const bitmap = await createImageBitmap(blob)
         try {
-          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-            canvas.width = bitmap.width
-            canvas.height = bitmap.height
-          }
-          canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+          // Draw into the bitmap `fit()` sized, never resizing to the frame's own
+          // dimensions: the frame can arrive for a viewport the pane has already
+          // left, and adopting its size would stretch the picture away from the
+          // coordinates the pointer is mapped against.
+          canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
         } finally {
           bitmap.close()
         }
@@ -207,9 +207,19 @@ export function BrowserBody(props: BrowserBodyProps): React.ReactElement {
       const box = stage.getBoundingClientRect()
       if (box.width <= 0 || box.height <= 0) return
       const viewport = viewportFor({ width: box.width, height: box.height }, viewportRef.current)
+      const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1))
       // Paint at the emulated size; the stage centers it, so no letterbox math.
       canvas.style.width = `${Math.round(viewport.width)}px`
       canvas.style.height = `${Math.round(viewport.height)}px`
+      // Resize the backing bitmap in the same step. Leaving it at the previous
+      // frame's size stretches the image until the next frame arrives, and every
+      // click then lands where the stretched picture shows rather than where the
+      // page is — the pointer appears offset by the scale difference.
+      const bitmap = bitmapSizeFor(viewport, dpr)
+      if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+        canvas.width = bitmap.width
+        canvas.height = bitmap.height
+      }
       setStatus((previous) => (previous.width === viewport.width && previous.height === viewport.height
         ? previous
         : { ...previous, width: viewport.width, height: viewport.height }))

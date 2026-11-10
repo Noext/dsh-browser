@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.2
+
+### Fixed
+
+- **Clicks landed away from the pointer.** The canvas kept the previous frame's
+  backing size while CSS showed the new viewport, so the picture was stretched and
+  a click hit where the stretched image appeared rather than where the page was.
+  On a tall narrow pane this put the search box under the logo. The bitmap now
+  follows the viewport in the same step, and frames are drawn into that fixed
+  bitmap instead of resizing it. Measured against a grid fixture: 0 px error at
+  five canvas positions, where a whole cell of drift came before.
+
 ## 0.2.1
 
 ### Added

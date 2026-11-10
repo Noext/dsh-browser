@@ -53,6 +53,27 @@ export function viewportFor(pane: { width: number; height: number }, fallback: V
 }
 
 /**
+ * Backing-bitmap size for a viewport.
+ *
+ * The canvas bitmap and the emulated viewport must agree, or the picture is
+ * stretched and every click lands where the stretched image shows rather than
+ * where the page is. Device pixel ratio is clamped so a 3× display cannot
+ * quadruple the decode cost.
+ * @param viewport - emulated page size in CSS pixels.
+ * @param devicePixelRatio - the window's ratio; defaults to 1.
+ * @returns integer bitmap dimensions.
+ */
+export function bitmapSizeFor(viewport: Viewport, devicePixelRatio = 1): Viewport {
+  // A non-finite ratio would poison both dimensions; fall back rather than
+  // hand the canvas a NaN size, which throws on assignment.
+  const ratio = Number.isFinite(devicePixelRatio) ? Math.min(2, Math.max(1, devicePixelRatio)) : 1
+  return {
+    width: Math.max(1, Math.round(viewport.width * ratio)),
+    height: Math.max(1, Math.round(viewport.height * ratio)),
+  }
+}
+
+/**
  * Map a pointer event position onto page pixels.
  * @param event - client coordinates of the pointer event.
  * @param rect - the canvas's bounding client rect.
