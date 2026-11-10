@@ -124,3 +124,66 @@
   flex: 1;
   min-width: 0;
 }
+.dsh-browser-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.dsh-browser-settings-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dsh-browser-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dsh-browser-setting label,
+.dsh-browser-setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dsh-browser-setting input[type="number"] {
+  width: 8em;
+  background: var(--dsh-surface-raised, #1e1e1c);
+  border: 1px solid var(--dsh-border, #333330);
+  border-radius: 6px;
+  /* An explicit colour, not `inherit`: the surrounding page sets its own text
+     colour, which leaves the value unreadable on the dark field. */
+  color: var(--dsh-text, #e8e6e3);
+  font: inherit;
+  padding: 3px 6px;
+}
+
+.dsh-browser-setting-help {
+  margin: 0;
+  color: var(--dsh-text-muted, #8a8a84);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dsh-browser-setting-changed {
+  color: #4a9fd4;
+  font-weight: 400;
+}
+
+.dsh-browser-setting-reset {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--dsh-text-muted, #8a8a84);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 0;
+  text-decoration: underline;
+}

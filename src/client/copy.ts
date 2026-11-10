@@ -29,6 +29,21 @@ export const copy = {
   'state.closed': 'The browser was closed',
   'state.unsupported': 'This tab needs the dsh-browser Host plugin',
   'request.title': 'The agent needs your help',
+  'settings.title': 'Browser settings',
+  'settings.save': 'Save',
+  'settings.reset': 'Reset to default',
+  'settings.refused': 'The Host refused this change.',
+  'settings.overridden': 'Changed',
+  'row.headed': 'Show a Chromium window',
+  'row.headedHelp': 'Off runs the browser headless: the mirror in the sidebar keeps working, but no window opens on the desktop.',
+  'row.profile': 'Keep cookies and logins',
+  'row.profileHelp': 'Stores the browser profile on disk so a sign-in survives a restart. Turned off, each browser starts clean.',
+  'row.quality': 'Mirror quality',
+  'row.qualityHelp': 'JPEG quality of the mirror, 20 to 95. Lower is faster over a slow link; higher keeps small text readable.',
+  'row.humanIdle': 'Takeover timeout',
+  'row.humanIdleHelp': 'Minutes before a forgotten human takeover hands the browser back to the agent. Zero never hands it back.',
+  'row.idleTimeout': 'Idle shutdown',
+  'row.idleTimeoutHelp': 'Minutes after which a browser nobody is watching closes itself. Zero keeps it open until the Session ends.',
 } as const
 
 /** Localized string keys. */

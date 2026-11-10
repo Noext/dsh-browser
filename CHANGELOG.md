@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.1
+
+### Added
+
+- A settings page on the plugin's own page in **Plugins**: turn the Chromium
+  window off to run headless, keep or drop the browser profile, choose the mirror
+  quality, and set the takeover and idle-shutdown timeouts. Changes are written to
+  the profile's patch and take effect on the next restart; nothing else has to be
+  edited by hand.
+- `GET /api/dsh-browser/status` reports `watching`, the number of windows
+  mirroring the browser.
+
+### Fixed
+
+- Editable settings were declared with `.volatile()` but read as plain values,
+  which turned the idle timeout into `NaN` and started Chromium with a window even
+  when told not to. They are read through `get()` now.
+- Number fields rendered their value in the surrounding text colour, which left
+  them unreadable on the dark surface.
+
 ## 0.2.0 — unreleased improvements
 
 The version was never bumped while the first three commits landed, so this entry

@@ -60,6 +60,12 @@ never tagged; see [CHANGELOG.md](CHANGELOG.md).
 | `startUrl` | `about:blank` | What a new browser opens |
 | `chromiumArgs` | — | Extra Chromium switches |
 
+The first six are editable from the plugin's own page: **Plugins → Browser**. A
+changed field is marked, **Reset to default** clears the override, and the write
+lands in the profile's `cordis.patch.yml`. `headed` is the one worth knowing:
+turn it off and Chromium never opens a window, while the sidebar mirror keeps
+working.
+
 ```yaml
 - id: dsh-browser
   config:

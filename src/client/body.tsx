@@ -13,7 +13,7 @@ import { FRAME_HEADER_BYTES, FRAME_MAGIC, WS_PATH, normalizeAddress } from '../s
 import type { ClientFrame, ControlState, ServerFrame, ViewSummary } from '../shared/protocol.ts'
 import { modifiersOf, toPageDelta, toPagePoint, viewportFor } from '../shared/geometry.ts'
 import { copy } from './copy.ts'
-import { STYLE_ID, STYLE_TEXT } from './style.ts'
+import { usePluginStyle } from './useStyle.ts'
 
 /** Owner props supplied by the Keyed Slot framework. */
 export type BrowserBodyProps = PropsRuntime<'sidebar.right.pane.tab'>
@@ -38,22 +38,6 @@ function vkOf(event: KeyboardEvent): number {
   if (named !== undefined) return named
   if (event.key.length === 1) return event.key.toUpperCase().charCodeAt(0)
   return event.keyCode
-}
-
-/**
- * Inject the plugin stylesheet once per document.
- *
- * The out-of-tree client bundle has no stylesheet pipeline, so the CSS ships as
- * a string and is attached on first render.
- */
-function usePluginStyle(): void {
-  useEffect(() => {
-    if (document.getElementById(STYLE_ID) !== null) return
-    const tag = document.createElement('style')
-    tag.id = STYLE_ID
-    tag.textContent = STYLE_TEXT
-    document.head.appendChild(tag)
-  }, [])
 }
 
 /** Render the browser tab. */

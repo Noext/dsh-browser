@@ -10,6 +10,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
+import type { Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -28,21 +29,21 @@ import type { Frame } from './view.ts'
 export interface Config {
   /** Chromium executable; omission discovers Playwright's cache or a system browser. */
   executablePath?: string
-  /** Run Chromium with a visible window; false uses the new headless mode. */
-  headed: boolean
-  /** Keep cookies and logins in `$DSH_HOME/browser-profiles`; false uses a temporary profile. */
-  persistentProfile: boolean
+  /** Run Chromium with a visible window; false uses the new headless mode. Editable from the plugin page. */
+  headed: Volatile<boolean>
+  /** Keep cookies and logins in `$DSH_HOME/browser-profiles`; false uses a temporary profile. Editable from the plugin page. */
+  persistentProfile: Volatile<boolean>
   /** Viewport when a pane has no measurement yet. */
   width: number
   height: number
-  /** JPEG quality of the mirror. */
-  quality: number
+  /** JPEG quality of the mirror. Editable from the plugin page. */
+  quality: Volatile<number>
   /** Concurrent browser sessions allowed on this Host. */
   maxSessions: number
-  /** Idle time before a human takeover lapses; 0 never lapses. */
-  humanIdleMs: number
-  /** Close a browser nobody is watching after this long; 0 never closes it. */
-  idleTimeoutMs: number
+  /** Idle time before a human takeover lapses; 0 never lapses. Editable from the plugin page. */
+  humanIdleMs: Volatile<number>
+  /** Close a browser nobody is watching after this long; 0 never closes it. Editable from the plugin page. */
+  idleTimeoutMs: Volatile<number>
   /** What a new session opens first. */
   startUrl: string
   /** Extra Chromium switches. */
@@ -50,16 +51,21 @@ export interface Config {
 }
 
 /** Validated plugin configuration. */
-export const Config: Schema<Config> = Schema.object({
+export const Config = Schema.object({
   executablePath: Schema.string().description('Chromium executable'),
-  headed: Schema.boolean().default(true).description('Show the browser window on the Host display'),
-  persistentProfile: Schema.boolean().default(true).description('Keep cookies and logins across restarts'),
+  headed: Schema.boolean().default(true).volatile()
+    .description('Show a Chromium window on the Host display; turn off to run headless'),
+  persistentProfile: Schema.boolean().default(true).volatile()
+    .description('Keep cookies and logins across restarts'),
   width: Schema.number().min(360).max(1920).default(1280).description('Browser viewport width'),
   height: Schema.number().min(300).max(1200).default(800).description('Browser viewport height'),
-  quality: Schema.number().min(20).max(95).default(62).description('Mirror JPEG quality'),
+  quality: Schema.number().min(20).max(95).default(62).volatile()
+    .description('Mirror JPEG quality: lower is faster, higher is sharper'),
   maxSessions: Schema.number().min(1).max(8).default(2).description('Concurrent browsers'),
-  humanIdleMs: Schema.number().min(0).default(600000).description('Human takeover idle timeout'),
-  idleTimeoutMs: Schema.number().min(0).default(300000).description('Close a browser with no viewer and no activity after this long; 0 keeps it open'),
+  humanIdleMs: Schema.number().min(0).default(600000).volatile()
+    .description('Milliseconds before a forgotten human takeover lapses; 0 never lapses'),
+  idleTimeoutMs: Schema.number().min(0).default(300000).volatile()
+    .description('Close a browser with no viewer and no activity after this long; 0 keeps it open'),
   startUrl: Schema.string().default('about:blank').description('Address a new browser opens'),
   chromiumArgs: Schema.array(Schema.string()).description('Extra Chromium switches'),
 })
@@ -81,12 +87,26 @@ export function apply(ctx: Context, config: Config): void {
     warn: (message: string, error?: unknown) => { ctx.logger.warn(message, error) },
     error: (message: string, error?: unknown) => { ctx.logger.error(message, error) },
   }
+  /**
+   * Read the editable settings.
+   *
+   * A `.volatile()` field is a live reference, not a plain value: it must be read
+   * through `get()` each time, and it is `undefined` until someone sets it.
+   */
+  const setting = {
+    headed: () => config.headed.get() ?? true,
+    persistentProfile: () => config.persistentProfile.get() ?? true,
+    quality: () => config.quality.get() ?? 62,
+    humanIdleMs: () => config.humanIdleMs.get() ?? 600_000,
+    idleTimeoutMs: () => config.idleTimeoutMs.get() ?? 300_000,
+  }
+
   log.info(`dsh-browser ${VERSION} starting`)
   const executablePath = config.executablePath ?? discoverExecutable()
   if (executablePath === undefined) {
     log.warn('no Chromium executable found; dsh-browser stays inert until one is configured')
   }
-  const profiles = createProfiles({ persistent: config.persistentProfile })
+  const profiles = createProfiles({ persistent: setting.persistentProfile() })
   // Browsers outlive a killed Host. Adopt them before serving anything, so a
   // restart reclaims its windows instead of stacking new ones beside them.
   void adoptOrphans(profiles.root).then((sweep) => {
@@ -109,7 +129,7 @@ export function apply(ctx: Context, config: Config): void {
       activeViewId: snapshot.activeViewId,
       viewport: snapshot.viewport,
       request: entry.session.pendingRequest,
-      profile: config.persistentProfile ? 'persistent' : 'ephemeral',
+      profile: setting.persistentProfile() ? 'persistent' : 'ephemeral',
       watching: viewers.get(agentId)?.size ?? 0,
       runs: { active: entries.size, max: config.maxSessions },
     }
@@ -136,13 +156,13 @@ export function apply(ctx: Context, config: Config): void {
       log,
       executablePath,
       profileRoot,
-      profileKind: config.persistentProfile ? 'persistent' : 'ephemeral',
-      headed: config.headed,
+      profileKind: setting.persistentProfile() ? 'persistent' : 'ephemeral',
+      headed: setting.headed(),
       viewport: { width: config.width, height: config.height },
-      quality: config.quality,
+      quality: setting.quality(),
       startTimeoutMs: 20_000,
-      humanIdleMs: config.humanIdleMs,
-      idleTimeoutMs: config.idleTimeoutMs,
+      humanIdleMs: setting.humanIdleMs(),
+      idleTimeoutMs: setting.idleTimeoutMs(),
       initialUrl: normalizeAddress(config.startUrl) ?? 'about:blank',
       sink: {
         onFrame(_session, view, frame: Frame) {
