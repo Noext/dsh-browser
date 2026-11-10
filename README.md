@@ -31,7 +31,8 @@ newer published versions and updates in place. A git install does not — DSH on
 offers updates for registry packages.
 
 > The unscoped name `dsh-browser` on npm belongs to an unrelated plugin by
-> another author, so this one is published under the `@noext34` scope.
+> another author, so this one is published under the `@noext34` scope:
+> [npmjs.com/package/@noext34/dsh-browser](https://www.npmjs.com/package/@noext34/dsh-browser).
 
 Chromium is discovered from `DSH_BROWSER_EXECUTABLE`, then Playwright's cache
 (`npx playwright install chromium`), then common system paths. Set
