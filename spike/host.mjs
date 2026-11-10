@@ -168,8 +168,9 @@ connect()
 
 /** Launch Chromium and return its CDP HTTP endpoint. */
 async function launch() {
-  const executable = process.env.DSH_BROWSER_EXECUTABLE
-    ?? '/root/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome'
+  const { discoverExecutable } = await import('../src/host/launcher.ts')
+  const executable = discoverExecutable()
+    ?? ''
   if (!existsSync(executable)) throw new Error(`chromium not found: ${executable}`)
   const profile = mkdtempSync(join(tmpdir(), 'dsh-browser-spike-'))
   const child = spawn(executable, [

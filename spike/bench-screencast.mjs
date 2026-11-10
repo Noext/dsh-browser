@@ -12,7 +12,10 @@ import { join } from 'node:path'
 import { WebSocket } from 'ws'
 
 const mode = process.argv[2] ?? 'headless'
-const executable = process.env.DSH_BROWSER_EXECUTABLE ?? '/root/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome'
+import { discoverExecutable } from '../src/host/launcher.ts'
+
+const executable = discoverExecutable()
+if (executable === undefined) throw new Error('no Chromium found: set DSH_BROWSER_EXECUTABLE or run "npx playwright install chromium"')
 const profile = mkdtempSync(join(tmpdir(), 'dsh-bench-'))
 const args = [
   '--remote-debugging-port=0', `--user-data-dir=${profile}`,

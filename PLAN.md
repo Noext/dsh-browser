@@ -2,7 +2,7 @@
 
 > **Statut : implémenté (M0 → M4), web uniquement.** Les mesures, l'écart au plan
 > et les leçons sont en fin de document (§12).
-> Cible : DSH `0.2.2-alpha.3` (checkout `/root/Dev/deepseek-harness`), plugin hors arborescence dans `/root/Dev/dsh-browser`.
+> Cible : DSH `0.2.2-alpha.3`, plugin hors arborescence (dépôt `dsh-browser`).
 > Auteur : agent, 2026-11-10.
 
 ---
@@ -356,7 +356,7 @@ Sur Electron, l'onglet Browser existant est un `<webview>` : son `webContents.de
 
 ## 11. Prochaine action concrète
 
-Lancer **M0** (spike d'une demi-journée) dans `/root/Dev/dsh-browser` : un `spike/` jetable, deux fichiers (`host.mjs`, `page.html`), qui prouve *screencast + input + auth WS* avant d'écrire une ligne du plugin. Si M0 passe ses critères, M1 démarre sur l'arborescence de la §4.
+Lancer **M0** (spike d'une demi-journée) à la racine du dépôt : un `spike/` jetable, deux fichiers (`host.mjs`, `page.html`), qui prouve *screencast + input + auth WS* avant d'écrire une ligne du plugin. Si M0 passe ses critères, M1 démarre sur l'arborescence de la §4.
 
 ---
 

@@ -21,6 +21,7 @@ import { discoverExecutable, LaunchError } from './launcher.ts'
 import { registerTools } from './tools.ts'
 import { BrowserSession } from './session.ts'
 import { createProfiles } from './profiles.ts'
+import { adoptOrphans } from './orphans.ts'
 import type { Frame } from './view.ts'
 
 /** Plugin configuration. */
@@ -82,6 +83,11 @@ export function apply(ctx: Context, config: Config): void {
     log.warn('no Chromium executable found; dsh-browser stays inert until one is configured')
   }
   const profiles = createProfiles({ persistent: config.persistentProfile })
+  // Browsers outlive a killed Host. Adopt them before serving anything, so a
+  // restart reclaims its windows instead of stacking new ones beside them.
+  void adoptOrphans(profiles.root).then((sweep) => {
+    if (sweep.killed.length > 0) log.warn(`closed ${sweep.killed.length} browser(s) left by a previous Host`)
+  }).catch((error: unknown) => { log.warn('could not adopt browsers left by a previous Host', error) })
   const entries = new Map<string, Entry>()
   const viewers = new Map<string, Set<WebSocket>>()
 

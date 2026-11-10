@@ -118,6 +118,21 @@ tool can reach anything Chromium can reach. Treat `browser_*` like shell access.
   refuses to start otherwise; the profile directory, not the renderer sandbox, is
   the isolation boundary here.
 
+## Abandoned browsers
+
+A Chromium outlives its parent, so a crashed or `kill -9`'d Host used to leave
+windows behind — and the next launch failed, because the dead browser still held
+the profile lock.
+
+Two mechanisms prevent that:
+
+- **Idle reclamation** closes a browser nobody is watching after `idleTimeoutMs`.
+  Agent and human activity both reset the clock, and work in flight blocks it.
+- **Orphan adoption** runs at startup: a profile whose `SingletonLock` names a
+  Chromium on this machine that is still alive is reclaimed and closed. A lock
+  naming a pid that is not Chromium, or a hostname that is not this one, is only
+  cleared — never signalled.
+
 ## Known limits
 
 - Chromium only. Firefox and WebKit are not supported.
