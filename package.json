@@ -1,0 +1,93 @@
+{
+  "name": "dsh-browser",
+  "version": "0.1.0",
+  "description": "A real Chromium in the DSH right sidebar: the agent drives it, and you can take over to sign in.",
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": ">=24.9.0",
+    "dsh": ">=0.2.0"
+  },
+  "icon": "./icon.svg",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "icon.svg",
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.4",
+    "@deepseek-ai/dsh-agent": ">=0.2.0-0 <0.3.0",
+    "@deepseek-ai/dsh-attachment": ">=0.2.0-0 <0.3.0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-0 <0.3.0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.2.0-0 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-0 <0.3.0",
+    "@deepseek-ai/schemastery": "^3.18.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-attachment": {
+      "optional": true
+    }
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.25.12",
+    "playwright-core": "^1.61.1",
+    "typescript": "^6.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Noext/dsh-browser.git"
+  },
+  "homepage": "https://github.com/Noext/dsh-browser#readme",
+  "bugs": {
+    "url": "https://github.com/Noext/dsh-browser/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "browser",
+    "chromium",
+    "cdp",
+    "agent",
+    "sidebar"
+  ]
+}

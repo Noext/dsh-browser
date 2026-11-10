@@ -1,0 +1,126 @@
+.dsh-browser-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--dsh-surface, #141413);
+  color: var(--dsh-text, #e8e6e3);
+  font: 12px/1.4 var(--dsh-font-sans, system-ui, sans-serif);
+}
+
+.dsh-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--dsh-border, #2a2a28);
+}
+
+.dsh-browser-bar button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+}
+
+.dsh-browser-bar button:hover {
+  background: var(--dsh-surface-raised, #262624);
+  border-color: var(--dsh-border, #383835);
+}
+
+.dsh-browser-address {
+  flex: 1;
+  min-width: 0;
+  background: var(--dsh-surface-raised, #1e1e1c);
+  border: 1px solid var(--dsh-border, #333330);
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  padding: 4px 8px;
+}
+
+.dsh-browser-badge {
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--dsh-border, #383835);
+  font-size: 11px;
+  color: var(--dsh-text-muted, #8a8a84);
+}
+
+.dsh-browser-badge--human {
+  color: #f0b429;
+  border-color: #f0b42955;
+}
+
+.dsh-browser-badge--agent {
+  color: #4a9fd4;
+  border-color: #4a9fd455;
+}
+
+.dsh-browser-action {
+  white-space: nowrap;
+}
+
+.dsh-browser-request {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: #f0b4291a;
+  border-bottom: 1px solid #f0b42955;
+  color: #f0b429;
+}
+
+.dsh-browser-notice {
+  padding: 6px 10px;
+  color: var(--dsh-text-muted, #8a8a84);
+  border-bottom: 1px solid var(--dsh-border, #2a2a28);
+}
+
+.dsh-browser-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #0f0f0e;
+}
+
+.dsh-browser-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  outline: none;
+  background: #000;
+  cursor: default;
+}
+
+.dsh-browser-canvas:focus {
+  outline: 2px solid #4a7fd4;
+  outline-offset: -2px;
+}
+
+.dsh-browser-status {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-top: 1px solid var(--dsh-border, #2a2a28);
+  color: var(--dsh-text-muted, #8a8a84);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dsh-browser-status-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}

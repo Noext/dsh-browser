@@ -1,0 +1,4 @@
+node_modules/
+.dsh-browser-profile/
+tests/shots/
+*.log
