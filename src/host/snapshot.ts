@@ -181,10 +181,16 @@ export async function snapshotPage(
     if (property('required') === true) parts.push('required')
     if (property('readonly') === true || property('readOnly') === true) parts.push('readonly')
     if (property('invalid') === true) parts.push('invalid')
-    // An input's current text is state a caller needs before typing into it.
+    // A file input reports its selection through its value, which is how a caller
+    // confirms an upload landed; an ordinary field shows its current text.
     const value = node.value?.value
     if (typeof value === 'string' && value !== '') {
       parts.push(`value=${JSON.stringify(value.slice(0, 60))}`)
+    }
+    // The role Chromium gives a file input carries no hint that it accepts files.
+    if ((node.role?.value ?? '') === 'button' && property('focusable') === true
+      && typeof value === 'string' && /no file chosen|^[^ ]+\.[a-z0-9]+$/iu.test(value)) {
+      parts.unshift('file-input')
     }
     return parts.length === 0 ? undefined : parts.join(' ')
   }

@@ -193,6 +193,110 @@ ctx.tools.register(defineTool({
     },
   }))
 
+ctx.tools.register(defineTool({
+    name: 'browser_upload',
+    description: 'Attach files to a file input, the way a person picks them. Pass the ref of the input and absolute Host paths of existing files.',
+    parameters: {
+      ref: { type: 'string', required: true, description: 'Ref of the file input from browser_snapshot or browser_find' },
+      files: { type: 'array', items: { type: 'string' }, required: true, description: 'Absolute paths of the files to attach' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: { names: { type: 'array', items: { type: 'string' } } },
+        additionalProperties: false,
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: (value.names ?? []).length === 0
+          ? 'the input reports no files'
+          : 'attached: ' + (value.names ?? []).join(', '),
+      }],
+    },
+    async execute(args, exec) {
+      const session = await claim(exec.agent, exec.signal)
+      const files = args.files ?? []
+      if (files.length === 0) throw new Error('give at least one file path')
+      const result = await view(session).setFiles(args.ref, files)
+      return { names: result.names }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'browser_select',
+    description: 'Choose an option in a select element by its visible text or value.',
+    parameters: {
+      ref: { type: 'string', required: true, description: 'Ref of the select element' },
+      option: { type: 'string', required: true, description: 'Visible text or value of the option' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: { selected: { type: 'string' } },
+        additionalProperties: false,
+      },
+      render: (_args, value) => [{ type: 'text', text: 'selected: ' + value.selected }],
+    },
+    async execute(args, exec) {
+      const session = await claim(exec.agent, exec.signal)
+      const result = await view(session).selectOption(args.ref, args.option)
+      return { selected: result.selected }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'browser_check',
+    description: 'Set a checkbox or radio to an explicit state. Prefer this over browser_click, which toggles and can flip the wrong way.',
+    parameters: {
+      ref: { type: 'string', required: true, description: 'Ref of the checkbox or radio' },
+      checked: { type: 'boolean', description: 'The state to end in; defaults to true' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: { checked: { type: 'boolean' }, label: { type: 'string' } },
+        additionalProperties: false,
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: (value.checked ? 'checked ' : 'unchecked ') + (value.label ?? ''),
+      }],
+    },
+    async execute(args, exec) {
+      const session = await claim(exec.agent, exec.signal)
+      return await view(session).setChecked(args.ref, args.checked !== false)
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'browser_wait',
+    description: 'Wait until the page has finished loading, and optionally until an element or some text appears. Use this instead of guessing that a page is ready.',
+    parameters: {
+      selector: { type: 'string', description: 'CSS selector that must exist' },
+      text: { type: 'string', description: 'Text that must be present on the page' },
+      timeoutMs: { type: 'number', description: 'Give up after this many milliseconds; defaults to 10000' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: { met: { type: 'boolean' }, waitedMs: { type: 'number' }, reason: { type: 'string' } },
+        additionalProperties: false,
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: (value.met ? 'ready after ' : 'gave up after ') + String(value.waitedMs ?? 0) + ' ms (' + String(value.reason ?? '') + ')',
+      }],
+    },
+    async execute(args, exec) {
+      const session = await claim(exec.agent, exec.signal)
+      return await view(session).waitFor({
+        ...(args.selector === undefined ? {} : { selector: args.selector }),
+        ...(args.text === undefined ? {} : { text: args.text }),
+        ...(args.timeoutMs === undefined ? {} : { timeoutMs: args.timeoutMs }),
+      })
+    },
+  }))
+
   ctx.tools.register(defineTool({
     name: 'browser_click',
     description: 'Click an element from browser_snapshot, or a CSS selector, or a point.',

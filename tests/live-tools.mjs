@@ -32,6 +32,6 @@ const visible = ctx.tools.schemas().map((schema) => schema.name).filter((name) =
 console.log('registered:', registered.length, '|', registered.join(', '))
 console.log('visible to the model:', visible.length)
 
-if (registered.length !== 11) { console.error('expected 11 tools, got', registered.length); process.exit(1) }
-if (visible.length !== 11) { console.error('only', visible.length, 'visible'); process.exit(1) }
-console.log('all eleven browser tools register and are model-visible')
+if (registered.length !== 15) { console.error('expected 15 tools, got', registered.length); process.exit(1) }
+if (visible.length !== 15) { console.error('only', visible.length, 'visible'); process.exit(1) }
+console.log('all fifteen browser tools register and are model-visible')

@@ -8,6 +8,7 @@
  * @module dsh-browser/host/view
  */
 import { chromeUserAgent } from './launcher.ts'
+import { existsSync } from 'node:fs'
 import { resolveClickPoint } from './refs.ts'
 import { snapshotPage, type Snapshot, type SnapshotOptions } from './snapshot.ts'
 import { CdpConnection, type CdpEvent } from './cdp.ts'
@@ -391,6 +392,152 @@ export class BrowserView {
       truncated: total > matches.length,
     }
     return { matches, total }
+  }
+
+  /**
+   * Attach files to a file input.
+   *
+   * A file input cannot be filled by typing: the browser only accepts a path
+   * through the file-system channel, and a page can then read the bytes as if a
+   * person had picked them. The path is Host-local, which is what the deployer's
+   * own filesystem already grants.
+   * @param ref - ref of the input from a snapshot or a find.
+   * @param files - absolute paths of existing files.
+   * @returns what the input now reports, for the model to confirm.
+   */
+  async setFiles(ref: string, files: readonly string[]): Promise<{ names: string[] }> {
+    const nodeId = this.lastSnapshot?.refs.get(ref)
+    if (nodeId === undefined) throw new Error(`unknown ref "${ref}"; take a new browser_snapshot`)
+    for (const file of files) {
+      if (!existsSync(file)) throw new Error(`no such file: ${file}`)
+    }
+    await this.options.connection.send('DOM.enable', {}, this.sessionId)
+    try {
+      await this.options.connection.send('DOM.setFileInputFiles', { files: [...files], backendNodeId: nodeId }, this.sessionId)
+    } catch (error) {
+      throw new Error(`cannot attach files to ${ref}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    const names = await this.options.connection.send<{ result?: { value?: unknown } }>('Runtime.evaluate', {
+      expression: `(() => {
+        const doc = document.activeElement
+        const input = doc && doc.type === 'file' ? doc : document.querySelector('input[type=file]')
+        return input == null ? [] : Array.from(input.files ?? []).map((f) => f.name)
+      })()`,
+      returnByValue: true,
+    }, this.sessionId)
+    const value = names.result?.value
+    return { names: Array.isArray(value) ? value.map(String) : [] }
+  }
+
+  /**
+   * Choose an option in a native select.
+   *
+   * A select is not a button: clicking it opens a popup the page cannot be
+   * driven through reliably. Setting the value and firing the events the
+   * framework listens to is what makes the form believe a person chose.
+   * @param ref - ref of the select.
+   * @param option - the visible label or the value to select.
+   * @returns the option now selected.
+   */
+  async selectOption(ref: string, option: string): Promise<{ selected: string }> {
+    const nodeId = this.lastSnapshot?.refs.get(ref)
+    if (nodeId === undefined) throw new Error(`unknown ref "${ref}"; take a new browser_snapshot`)
+    await this.options.connection.send('DOM.enable', {}, this.sessionId)
+    const doc = await this.options.connection.send<{ object?: { objectId?: string } }>(
+      'DOM.resolveNode', { backendNodeId: nodeId }, this.sessionId,
+    )
+    const objectId = doc.object?.objectId
+    if (objectId === undefined) throw new Error(`the ref "${ref}" no longer names an element`)
+    const result = await this.options.connection.send<{ result?: { value?: unknown } }>('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: `function (wanted) {
+        if (this.tagName !== 'SELECT') return { error: 'not a select (' + this.tagName + ')' }
+        const options = Array.from(this.options)
+        const match = options.find((o) => o.value === wanted) ?? options.find((o) => o.textContent.trim() === wanted)
+        if (!match) return { error: 'no option named ' + wanted + '; available: ' + options.map((o) => o.textContent.trim()).join(', ') }
+        this.value = match.value
+        this.dispatchEvent(new Event('input', { bubbles: true }))
+        this.dispatchEvent(new Event('change', { bubbles: true }))
+        return { selected: match.textContent.trim() }
+      }`,
+      arguments: [{ value: option }],
+      returnByValue: true,
+    }, this.sessionId)
+    const value = result.result?.value as { selected?: string; error?: string } | undefined
+    if (value?.error !== undefined) throw new Error(value.error)
+    return { selected: value?.selected ?? option }
+  }
+
+  /**
+   * Set a checkbox or radio to an explicit state.
+   *
+   * Clicking is not the same thing: a click toggles, so a caller that cannot see
+   * the current state flips it the wrong way half the time. This sets the state
+   * the caller asked for and reports the result.
+   * @param ref - ref of the checkbox or radio.
+   * @param checked - the state to end in.
+   * @returns the state after the change.
+   */
+  async setChecked(ref: string, checked: boolean): Promise<{ checked: boolean; label: string }> {
+    const nodeId = this.lastSnapshot?.refs.get(ref)
+    if (nodeId === undefined) throw new Error(`unknown ref "${ref}"; take a new browser_snapshot`)
+    await this.options.connection.send('DOM.enable', {}, this.sessionId)
+    const doc = await this.options.connection.send<{ object?: { objectId?: string } }>(
+      'DOM.resolveNode', { backendNodeId: nodeId }, this.sessionId,
+    )
+    const objectId = doc.object?.objectId
+    if (objectId === undefined) throw new Error(`the ref "${ref}" no longer names an element`)
+    const result = await this.options.connection.send<{ result?: { value?: unknown } }>('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: `function (wanted) {
+        const type = this.type ?? this.tagName.toLowerCase()
+        if (!['checkbox', 'radio', 'switch'].includes(type)) return { error: 'not a checkbox or radio (' + type + ')' }
+        if (this.disabled) return { error: 'the control is disabled' }
+        if (this.checked !== wanted) this.click()
+        return { checked: this.checked, label: (this.getAttribute('aria-label') || this.value || '').slice(0, 60) }
+      }`,
+      arguments: [{ value: checked }],
+      returnByValue: true,
+    }, this.sessionId)
+    const value = result.result?.value as { checked?: boolean; label?: string; error?: string } | undefined
+    if (value?.error !== undefined) throw new Error(value.error)
+    return { checked: value?.checked === true, label: value?.label ?? '' }
+  }
+
+  /**
+   * Wait until the page settles or a condition holds.
+   *
+   * A navigation returns before the page is usable, so an agent that acts
+   * immediately clicks a placeholder. This waits for the document to finish, and
+   * optionally for an element or text to appear.
+   * @param options - what to wait for, and how long.
+   * @returns whether the condition was met before the deadline.
+   */
+  async waitFor(options: { selector?: string; text?: string; timeoutMs?: number }): Promise<{
+    met: boolean
+    waitedMs: number
+    reason: string
+  }> {
+    const timeoutMs = Math.max(100, Math.min(options.timeoutMs ?? 10_000, 60_000))
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+      const check = await this.options.connection.send<{ result?: { value?: unknown } }>('Runtime.evaluate', {
+        expression: `(() => {
+          if (document.readyState !== 'complete') return { ready: false, detail: 'loading' }
+          ${options.selector === undefined ? '' : `if (document.querySelector(${JSON.stringify(options.selector)}) === null) return { ready: false, detail: 'selector absent' }`}
+          ${options.text === undefined ? '' : `if (!document.body || !document.body.innerText.includes(${JSON.stringify(options.text)})) return { ready: false, detail: 'text absent' }`}
+          return { ready: true, detail: 'ready' }
+        })()`,
+        returnByValue: true,
+      }, this.sessionId)
+      const value = check.result?.value as { ready?: boolean; detail?: string } | undefined
+      if (value?.ready === true) {
+        return { met: true, waitedMs: Date.now() - started, reason: value.detail ?? 'ready' }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    return { met: false, waitedMs: Date.now() - started, reason: `timed out after ${timeoutMs} ms` }
   }
 
   /** The most recent snapshot, whose refs a later action resolves against. */

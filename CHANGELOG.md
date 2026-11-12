@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+
+- **`browser_upload`: attach files to a file input.** A file input cannot be
+  typed into or filled by a click; the browser only accepts a Host path through
+  the file-system channel. An agent can now submit the form that is blocking it,
+  and the result reports the file names the input actually holds.
+- **`browser_select`: choose an option in a native select** by visible text or
+  value, firing the events a framework listens to instead of fighting a popup.
+- **`browser_check`: set a checkbox or radio to an explicit state.** A click
+  toggles, so a caller that cannot see the current state flips it the wrong way
+  half the time; this sets the state asked for and reports the result.
+- **`browser_wait`: wait for the document, a selector, or some text** instead of
+  assuming a page is ready. Returns whether the condition was met and how long
+  it waited.
+
+### Changed
+
+- A file input is labelled `file-input` in the tree; Chromium reports it as a
+  plain button whose value is the chosen file name.
+
 ## 0.3.2
 
 ### Fixed
