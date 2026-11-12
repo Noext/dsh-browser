@@ -19,6 +19,8 @@ export interface SnapshotLine {
   readonly role: string
   readonly name: string
   readonly ref: string | undefined
+  /** Compact state such as `checked`, `disabled`, `expanded`, or an input value. */
+  readonly state: string | undefined
 }
 
 /** A snapshot ready for the model. */
@@ -152,6 +154,41 @@ export async function snapshotPage(
    * unrelated element. A skipped node passes its own depth to its children so
    * they are promoted instead of indented under nothing.
    */
+  /**
+   * Summarise the state a control carries.
+   *
+   * Without this an agent cannot tell a checked radio from an unchecked one, so
+   * it falls back to screenshots to see something as basic as which option is
+   * selected. The accessibility tree already records it; this makes it visible.
+   * @param node - the node to describe.
+   * @returns a compact suffix, or undefined when the node carries no state.
+   */
+  const stateOf = (node: AxNode): string | undefined => {
+    const parts: string[] = []
+    // CDP encodes AX booleans as the strings "true"/"false" as often as real
+    // booleans, so comparing with `=== true` silently loses every flag.
+    const property = (name: string): boolean | undefined => {
+      const raw = node.properties?.find((entry) => entry.name === name)?.value?.value
+      if (raw === true || raw === 'true') return true
+      if (raw === false || raw === 'false') return false
+      return undefined
+    }
+    if (property('checked') === true) parts.push('checked')
+    if (property('expanded') === true) parts.push('expanded')
+    if (property('expanded') === false) parts.push('collapsed')
+    if (property('selected') === true) parts.push('selected')
+    if (property('disabled') === true) parts.push('disabled')
+    if (property('required') === true) parts.push('required')
+    if (property('readonly') === true || property('readOnly') === true) parts.push('readonly')
+    if (property('invalid') === true) parts.push('invalid')
+    // An input's current text is state a caller needs before typing into it.
+    const value = node.value?.value
+    if (typeof value === 'string' && value !== '') {
+      parts.push(`value=${JSON.stringify(value.slice(0, 60))}`)
+    }
+    return parts.length === 0 ? undefined : parts.join(' ')
+  }
+
   const render = (node: AxNode, depth: number): void => {
     if (lines.length >= maxLines) { truncated = true; return }
     const role = node.role?.value ?? 'unknown'
@@ -179,7 +216,10 @@ export async function snapshotPage(
       const echo = role === 'StaticText' && parentName !== ''
         && (parentName === name || parentName.includes(name))
       if (!echo && (interactive || name.length > 0)) {
-        lines.push({ depth, role, name: name.slice(0, 160), ref: interactive ? ref : undefined })
+        lines.push({
+          depth, role, name: name.slice(0, 160), ref: interactive ? ref : undefined,
+          state: interactive ? stateOf(node) : undefined,
+        })
         rendered = true
       }
     }
@@ -204,7 +244,8 @@ export async function snapshotPage(
   let used = 0
   for (const line of lines) {
     const label = line.name === '' ? line.role : `${line.role} "${line.name}"`
-    const text = `${'  '.repeat(line.depth)}- ${label}${line.ref === undefined ? '' : ` [ref=${line.ref}]`}`
+    const suffix = line.state === undefined ? '' : line.state.startsWith('value=') ? ` ${line.state}` : ` (${line.state})`
+    const text = `${'  '.repeat(line.depth)}- ${label}${line.ref === undefined ? '' : ` [ref=${line.ref}]`}${suffix}`
     if (used + text.length > maxChars) { truncated = true; break }
     out.push(text)
     used += text.length + 1
@@ -226,6 +267,8 @@ interface AxNode {
   readonly ignored?: boolean
   readonly role?: { value?: string }
   readonly name?: { value?: string }
+  readonly value?: { value?: unknown }
+  readonly properties?: readonly { name: string; value?: { value?: unknown } }[]
   readonly parentId?: string
   readonly childIds?: readonly string[]
   readonly backendDOMNodeId?: number

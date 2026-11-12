@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.2
+
+### Fixed
+
+- **A snapshot reported structure but not state.** No line said whether a radio
+  was checked, a control disabled, a menu expanded, or an input already
+  populated — so an agent took a screenshot to answer "which option is
+  selected", exactly the cost the snapshot exists to remove. State now rides
+  each line: `radio "Option A" [ref=e3] (checked)`,
+  `textbox "Name" [ref=e2] (readonly value="hello")`.
+
+- CDP encodes accessibility booleans as the strings `"true"` and `"false"` as
+  often as real booleans; comparing with `=== true` silently lost every flag.
+
 ## 0.3.1
 
 ### Added
