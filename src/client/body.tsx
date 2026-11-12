@@ -33,11 +33,36 @@ const VK: Record<string, number> = {
 }
 
 /** Windows virtual key code for one DOM key event. */
+/**
+ * Windows virtual key code for one character.
+ *
+ * A character's char code is not a virtual key code: '.' is char 46, which is
+ * VK_DELETE, so sending it deleted text instead of typing a period and left the
+ * field empty. Punctuation has its own VK range (186-222), and a character with
+ * no entry is typed by its `text` alone, which the browser inserts directly.
+ * @param event - the keyboard event to describe.
+ * @returns the virtual key code to send, or 0 when the text is enough.
+ */
 function vkOf(event: KeyboardEvent): number {
   const named = VK[event.key]
   if (named !== undefined) return named
-  if (event.key.length === 1) return event.key.toUpperCase().charCodeAt(0)
-  return event.keyCode
+  if (event.key.length !== 1) return event.keyCode
+  const upper = event.key.toUpperCase()
+  // Letters and digits match their ASCII code, which is also their VK.
+  if (/[A-Z0-9 ]/u.test(upper)) return upper.charCodeAt(0)
+  return PUNCTUATION_VK[event.code] ?? 0
+}
+
+/**
+ * Virtual key codes for punctuation, keyed by `KeyboardEvent.code`.
+ *
+ * These are the codes Windows and Chromium actually use for the US layout; the
+ * browser needs them to report the right key while `text` supplies the glyph.
+ */
+const PUNCTUATION_VK: Readonly<Record<string, number>> = {
+  Period: 190, Comma: 188, Slash: 191, Semicolon: 186, Quote: 222,
+  BracketLeft: 219, BracketRight: 221, Backslash: 220, Backquote: 192,
+  Minus: 189, Equal: 187, IntlBackslash: 226,
 }
 
 /** Render the browser tab. */
@@ -295,14 +320,18 @@ export function BrowserBody(props: BrowserBodyProps): React.ReactElement {
 
   const onWheel = (event: React.WheelEvent<HTMLCanvasElement>): void => {
     if (!acceptsInput) return
+    // The panel scrolls the page inside the canvas, never the Host shell.
+    event.preventDefault()
     const mapped = toPagePoint({ x: event.clientX, y: event.clientY }, event.currentTarget.getBoundingClientRect(), viewportRef.current)
     if (mapped === undefined) return
     const rect = event.currentTarget.getBoundingClientRect()
     send({
       t: 'wheel',
       ...mapped,
-      dx: Math.round(toPageDelta(-event.deltaX, viewportRef.current, rect)),
-      dy: Math.round(toPageDelta(-event.deltaY, viewportRef.current, rect)),
+      // Wheel deltas keep the browser's sign: a positive deltaY scrolls down, and
+      // CDP reads it the same way. Negating here inverted the panel's scroll.
+      dx: Math.round(toPageDelta(event.deltaX, viewportRef.current, rect)),
+      dy: Math.round(toPageDelta(event.deltaY, viewportRef.current, rect)),
     })
   }
 

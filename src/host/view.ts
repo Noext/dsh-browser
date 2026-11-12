@@ -268,8 +268,9 @@ export class BrowserView {
       type: event.type === 'down' ? (isText ? 'keyDown' : 'rawKeyDown') : 'keyUp',
       key: event.key,
       code: event.code,
-      windowsVirtualKeyCode: event.vk,
-      nativeVirtualKeyCode: event.vk,
+      // A character with no meaningful virtual key is typed by `text`; sending a
+      // wrong code instead makes Chromium delete or move the caret.
+      ...(event.vk === 0 ? {} : { windowsVirtualKeyCode: event.vk, nativeVirtualKeyCode: event.vk }),
       ...(isText ? { text: event.text, unmodifiedText: event.text } : {}),
       modifiers: event.modifiers,
     })
@@ -517,6 +518,18 @@ export class BrowserView {
     const value = result.result?.value as { checked?: boolean; label?: string; error?: string } | undefined
     if (value?.error !== undefined) throw new Error(value.error)
     return { checked: value?.checked === true, label: value?.label ?? '' }
+  }
+
+  /**
+   * Evaluate one expression in the page, for tests and for measuring state.
+   * @param expression - JavaScript to run in the page's own context.
+   * @returns the value, serialised by value.
+   */
+  async evaluateForTest(expression: string): Promise<unknown> {
+    const result = await this.options.connection.send<{ result?: { value?: unknown } }>(
+      'Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, this.sessionId,
+    )
+    return result.result?.value
   }
 
   /**

@@ -20,7 +20,7 @@ const server = createServer((_q, s) => {
   s.writeHead(200, { 'content-type': 'text/html' })
   s.end('<title>site</title>')
 })
-const port = await new Promise((r) => server.listen(0, '127.0.0.1', () => r((server.address()).port)))
+const port = await new Promise<number>((r) => server.listen(0, '127.0.0.1', () => r((server.address() as { port: number }).port)))
 const origin = 'http://127.0.0.1:' + port + '/'
 
 const DSH_HOME = mkdtempSync(join(tmpdir(), 'dshhome-'))
@@ -29,7 +29,7 @@ process.on('exit', cleanup)
 
 // The child script is assembled with plain concatenation so nothing in this
 // file's own template syntax is interpolated by accident.
-function childScript(writeCookie) {
+function childScript(writeCookie: boolean): string {
   const profile = srcDir + '/profiles.ts'
   const sessionMod = srcDir + '/session.ts'
   const launcher = srcDir + '/launcher.ts'
@@ -63,7 +63,12 @@ function childScript(writeCookie) {
   ].join('\n')
 }
 
-async function boot(writeCookie) {
+/**
+ * Run one boot in a separate process.
+ * @param writeCookie - whether to write the cookie first.
+ * @returns the cookie value that boot could read.
+ */
+async function boot(writeCookie: boolean): Promise<string> {
   const child = spawn(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', childScript(writeCookie)], {
     env: { ...process.env, DSH_HOME }, stdio: ['ignore', 'pipe', 'pipe'],
   })

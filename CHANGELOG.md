@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.3
+
+### Fixed
+
+- **The panel scrolled the wrong way.** A wheel event's `deltaY` was negated
+  before reaching CDP, but the browser and CDP already agree on the sign: a
+  positive delta scrolls down. Negating it made every wheel gesture invert.
+  The event also no longer scrolls the Host shell behind the canvas.
+- **A period could not be typed into a field.** Character keys were sent with
+  their char code as a virtual key code, and `.` is char 46, which is
+  `VK_DELETE`: the browser deleted text instead of typing a period, so the field
+  stayed empty. Punctuation now uses its real virtual key (186-192, 219-222), and
+  a character with no meaningful code is typed by its text alone.
+
+- `tests/input-fidelity.ts` scrolls a real page in both directions and types
+  `a1.,-/` into a real field.
+
 ## 0.4.2
 
 ### Fixed
