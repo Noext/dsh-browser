@@ -79,10 +79,16 @@ export async function launchBrowser(options: LaunchOptions): Promise<Launch> {
     '--disable-features=Translate,MediaRouter',
     // Chromium's own crash reporter would upload; the profile is a user secret.
     '--disable-breakpad',
-    // The new headless mode is a real Chromium, but it still reports
-    // "HeadlessChrome" in its User-Agent, which sign-in providers treat as a
-    // bot. Presenting the same Chrome version keeps those flows working.
-    ...(options.headed ? [] : ['--headless=new', `--user-agent=${chromeUserAgent()}`]),
+    // Sign-in providers look at more than the User-Agent string. Headless
+    // Chromium also reports "HeadlessChrome" in its UA, exposes
+    // `navigator.webdriver`, and sends a `sec-ch-ua` branding of "Chromium".
+    // These switches make all three agree with the Chrome version actually
+    // running; without them Google answers "this browser or app may not be
+    // secure" even when the UA string looks normal.
+    ...(options.headed ? [] : ['--headless=new']),
+    `--user-agent=${chromeUserAgent()}`,
+    `--brand=${chromeBranding()}`,
+    '--disable-blink-features=AutomationControlled',
     // Chromium refuses to start as root with its sandbox enabled; the plugin's
     // own confinement story is the profile directory, not the renderer sandbox.
     ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []),
@@ -183,12 +189,25 @@ export async function launchBrowser(options: LaunchOptions): Promise<Launch> {
  * get an honest platform and version.
  * @returns the User-Agent to present in headless mode.
  */
-function chromeUserAgent(): string {
+export function chromeUserAgent(): string {
   const platform = process.platform === 'darwin' ? 'Macintosh; Intel Mac OS X 10_15_7'
     : process.platform === 'win32' ? 'Windows NT 10.0; Win64; x64'
       : 'X11; Linux x86_64'
   const version = process.versions.chrome ?? '156.0.0.0'
   return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`
+}
+
+
+/**
+ * Chrome's product branding, so `sec-ch-ua` does not say "Chromium".
+ *
+ * Client hints are what a site reads for the browser family; leaving the
+ * default makes a real Chrome identify as plain Chromium, which some sign-in
+ * flows treat as unsupported.
+ * @returns the `--brand` argument value.
+ */
+function chromeBranding(): string {
+  return `Google Chrome`
 }
 
 /**

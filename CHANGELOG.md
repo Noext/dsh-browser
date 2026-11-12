@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.6
+
+### Fixed
+
+- **Google still refused to sign in after the User-Agent fix.** Sign-in
+  providers read more than the UA string. Headless Chromium also exposed
+  `navigator.webdriver === true` and sent `sec-ch-ua` branding itself as
+  "Chromium" rather than "Google Chrome"; either is enough to refuse an account
+  login. The launcher disables the automation flag, and each page now carries a
+  CDP identity override that sets the User-Agent, its client hints, and the
+  metadata they derive from. `tests/google-signin.ts` submits a throwaway
+  identifier through a real session and fails if Google refuses.
+
 ## 0.2.5
 
 ### Fixed

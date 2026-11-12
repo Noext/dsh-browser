@@ -7,6 +7,7 @@
  * protocol ambiguous, so the session serialises viewers instead.
  * @module dsh-browser/host/view
  */
+import { chromeUserAgent } from './launcher.ts'
 import { CdpConnection, type CdpEvent } from './cdp.ts'
 import type { Log } from './log.ts'
 
@@ -88,6 +89,8 @@ export class BrowserView {
     await this.send('Page.enable')
     await this.send('Runtime.enable')
     await this.send('Page.setLifecycleEventsEnabled', { enabled: true })
+    // Identity first: a view rebuilt by an external action must look the same.
+    await this.applyChromeIdentity()
     // Keep the mirror honest: emulate a desktop viewport, never a mobile one.
     await this.applyViewport(this.viewport, this.deviceScaleFactor)
     await this.navigate(initialUrl)
@@ -345,6 +348,45 @@ export class BrowserView {
 
   /** True after {@link close} or after the target disappeared. */
   get isClosed(): boolean { return this.closed }
+
+  /**
+   * Present this page as Google Chrome rather than plain Chromium.
+   *
+   * Sign-in providers read the User-Agent Client Hints, not only the UA string.
+   * `--user-agent` leaves the hint branding as "Chromium", and Google answers
+   * that with "this browser or app may not be secure". The CDP override is the
+   * supported way to set the metadata those hints are derived from; it is scoped
+   * to this target, so it survives navigation and is dropped with the page.
+   */
+  private async applyChromeIdentity(): Promise<void> {
+    const version = process.versions.chrome ?? '156.0.0.0'
+    const major = version.split('.')[0]
+    await this.send('Emulation.setUserAgentOverride', {
+      userAgent: chromeUserAgent(),
+      acceptLanguage: 'en-US,en',
+      platform: process.platform === 'darwin' ? 'MacIntel' : process.platform === 'win32' ? 'Win32' : 'Linux x86_64',
+      userAgentMetadata: {
+        brands: [
+          { brand: 'Not:A-Brand', version: '8' },
+          { brand: 'Chromium', version: major },
+          { brand: 'Google Chrome', version: major },
+        ],
+        fullVersionList: [
+          { brand: 'Not:A-Brand', version: '8.0.0.0' },
+          { brand: 'Chromium', version },
+          { brand: 'Google Chrome', version },
+        ],
+        fullVersion: version,
+        platform: process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux',
+        platformVersion: '6.8.0',
+        architecture: 'x86',
+        model: '',
+        mobile: false,
+        bitness: '64',
+        wow64: false,
+      },
+    })
+  }
 
   private async applyViewport(viewport: { width: number; height: number }, deviceScaleFactor: number): Promise<void> {
     await this.send('Emulation.setDeviceMetricsOverride', {
