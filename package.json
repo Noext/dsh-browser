@@ -1,6 +1,6 @@
 {
   "name": "@noext34/dsh-browser",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A real Chromium in the DSH right sidebar: the agent drives it, and you can take over to sign in.",
   "type": "module",
   "main": "lib/index.js",

@@ -57,8 +57,10 @@ assert.ok(buttonRef, 'the button should carry a ref')
 const clicked = await view.clickRef(buttonRef!)
 console.log('clicked:', clicked.detail)
 
-const after = await view.snapshot()
-assert.match(after.text, /clicked/u, 'the page should show the click landed')
+// Interactive snapshots carry actions, not output text; read the page to see the
+// effect. That is also what an agent would do to verify its own step.
+const afterText = await view.readText(500)
+assert.match(afterText.text, /clicked/u, 'the page should show the click landed')
 
 // A stale ref must be refused, not silently applied to whatever is there now.
 await view.navigate(`http://127.0.0.1:${port}/?again`)

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.1
+
+### Added
+
+- **`browser_find`: reach an element past a truncated snapshot.** On a dense page
+  the tree is cut on purpose — Wikipedia yields 746 interactive nodes, and 44K of
+  tree costs more than the screenshots it replaces. `browser_find` matches by
+  role and/or visible text anywhere on the page and returns a ref, which
+  `browser_click` and `browser_type` accept.
+
+### Fixed
+
+- A `browser_find` wiped the refs the previous snapshot had handed out, so a ref
+  taken before the find became unusable. Both now share one table, because they
+  describe the same page.
+- Interactive snapshots no longer contain text nodes, which were most of a dense
+  page's bulk: the same Wikipedia page dropped from 44K characters to 9.5K while
+  keeping every actionable element.
+
 ## 0.3.0
 
 ### Added

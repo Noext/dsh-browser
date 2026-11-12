@@ -347,6 +347,52 @@ export class BrowserView {
     await this.mouse({ type: 'up', x: target.point.x, y: target.point.y, button: 0, clickCount: 1, modifiers: 0 })
   }
 
+  /**
+   * Find elements by role and/or accessible name, anywhere on the page.
+   *
+   * A truncated snapshot cannot list the whole of a dense page, so this is how a
+   * caller reaches an element past the cut without scrolling through it.
+   * @param query - role and/or text to match, case-insensitively.
+   * @returns matching elements with a ref each.
+   */
+  async find(query: { role?: string; name?: string; max?: number }): Promise<{
+    matches: { role: string; name: string; ref: string }[]
+    total: number
+  }> {
+    const limit = Math.max(1, Math.min(query.max ?? 20, 100))
+    await this.options.connection.send('Accessibility.enable', {}, this.sessionId)
+    const tree = await this.options.connection.send<{ nodes?: AxSnapNode[] }>(
+      'Accessibility.getFullAXTree', {}, this.sessionId,
+    )
+    const nodes = tree.nodes ?? []
+    const wantedRole = query.role?.toLowerCase()
+    const wantedName = query.name?.toLowerCase()
+    const matches: { role: string; name: string; ref: string }[] = []
+    let total = 0
+    for (const node of nodes) {
+      if (node.ignored === true || node.backendDOMNodeId === undefined) continue
+      const role = node.role?.value ?? ''
+      const name = (node.name?.value ?? '').replace(/\s+/gu, ' ').trim()
+      if (wantedRole !== undefined && role.toLowerCase() !== wantedRole) continue
+      if (wantedName !== undefined && !name.toLowerCase().includes(wantedName)) continue
+      if (wantedName === undefined && wantedRole === undefined) continue
+      if (name === '' && wantedName !== undefined) continue
+      total++
+      if (matches.length >= limit) continue
+      matches.push({ role, name: name.slice(0, 120), ref: `e${node.backendDOMNodeId}` })
+    }
+    // Refs from a find must stay usable, and a find must not invalidate refs the
+    // previous snapshot handed out: both name the same page, so the tables merge.
+    const refs = new Map(this.lastSnapshot?.refs ?? [])
+    for (const match of matches) refs.set(match.ref, Number(match.ref.slice(1)))
+    this.lastSnapshot = {
+      text: this.lastSnapshot?.text ?? '',
+      refs, url: this.url, title: this.title, nodeCount: matches.length,
+      truncated: total > matches.length,
+    }
+    return { matches, total }
+  }
+
   /** The most recent snapshot, whose refs a later action resolves against. */
   get snapshotState(): Snapshot | undefined { return this.lastSnapshot }
 
@@ -521,4 +567,11 @@ export class BrowserView {
         break
     }
   }
+}
+/** The subset of an accessibility node that \`find\` reads. */
+interface AxSnapNode {
+  readonly ignored?: boolean
+  readonly role?: { value?: string }
+  readonly name?: { value?: string }
+  readonly backendDOMNodeId?: number
 }

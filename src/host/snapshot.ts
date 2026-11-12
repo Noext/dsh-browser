@@ -40,6 +40,8 @@ export interface SnapshotOptions {
   readonly maxChars?: number
   /** Maximum rendered lines. */
   readonly maxLines?: number
+  /** CSS selector to scope the tree to; the whole page when omitted. */
+  readonly scope?: string
 }
 
 /** Roles an agent can act on. Static text is read from its parent instead. */
@@ -71,13 +73,38 @@ export async function snapshotPage(
   options: SnapshotOptions = {},
 ): Promise<Snapshot> {
   const interactiveOnly = options.interactiveOnly ?? true
-  const maxChars = options.maxChars ?? 16_000
-  const maxLines = options.maxLines ?? 400
+  // One model turn cannot usefully carry a whole dense page: Wikipedia yields
+  // 746 interactive nodes, and 44K of tree costs more than the screenshots this
+  // replaces. The default stays small and says so when cut; `scope` and
+  // `browser_find` are how a caller reaches the rest.
+  const maxChars = options.maxChars ?? 12_000
+  const maxLines = options.maxLines ?? 300
 
   await connection.send('Accessibility.enable', {}, sessionId)
+
+  // A scoped read resolves the selector to one node, then walks only its
+  // subtree. This is how a caller keeps a dense page inside the budget.
+  await connection.send('Accessibility.enable', {}, sessionId)
+  let scopedBackendId: number | undefined
+  if (options.scope !== undefined && options.scope.trim() !== '') {
+    await connection.send('DOM.enable', {}, sessionId)
+    try {
+      const doc = await connection.send<{ root?: { nodeId?: number } }>('DOM.getDocument', { depth: 0 }, sessionId)
+      const found = await connection.send<{ nodeId?: number }>('DOM.querySelector', {
+        nodeId: doc.root?.nodeId, selector: options.scope,
+      }, sessionId)
+      if (found.nodeId !== undefined && found.nodeId !== 0) {
+        const described = await connection.send<{ node?: { backendNodeId?: number } }>(
+          'DOM.describeNode', { nodeId: found.nodeId }, sessionId,
+        )
+        scopedBackendId = described.node?.backendNodeId
+      }
+    } catch { /* an invalid selector falls back to the whole page */ }
+  }
+
   const tree = await connection.send<{ nodes?: AxNode[] }>('Accessibility.getFullAXTree', {}, sessionId)
   const nodes = tree.nodes ?? []
-
+  /** The flat tree indexed by node id; parents and children are references. */
   const byId = new Map<string, AxNode>()
   for (const node of nodes) byId.set(node.nodeId, node)
 
@@ -131,16 +158,26 @@ export async function snapshotPage(
     const name = (node.name?.value ?? '').replace(/\s+/gu, ' ').trim()
     const interactive = INTERACTIVE_ROLES.has(role)
     const keep = isUseful(node)
+    // In interactive mode only actionable nodes and the containers that give them
+    // context are drawn. Text nodes are most of a dense page's bulk and add
+    // nothing to a click.
+    const structural = role === 'RootWebArea' || role === 'navigation' || role === 'main'
+      || role === 'form' || role === 'dialog' || role === 'search'
+    const relevant = interactiveOnly
+      ? (interactive || structural)
+      : (interactive || CONTENT_ROLES.has(role))
     let rendered = false
-    if (keep && (!interactiveOnly || interactive || CONTENT_ROLES.has(role))) {
+    if (keep && relevant) {
       const ref = node.backendDOMNodeId === undefined ? undefined : `e${node.backendDOMNodeId}`
       if (ref !== undefined && node.backendDOMNodeId !== undefined) refs.set(ref, node.backendDOMNodeId)
       // StaticText under an element repeats that element's name; skip the echo.
       const parent = node.parentId === undefined ? undefined : byId.get(node.parentId)
-      // A text node repeats the accessible name of the element that owns it;
-      // the element's own line already carries that text.
-      const echo = role === 'StaticText' && parent !== undefined
-        && (parent.name?.value ?? '').trim() === name
+      // A text node usually repeats the accessible name of the element that owns
+      // it, and the element's own line already carries that text. Comparing the
+      // two is what keeps a dense page readable instead of doubling every link.
+      const parentName = (parent?.name?.value ?? '').replace(/\s+/gu, ' ').trim()
+      const echo = role === 'StaticText' && parentName !== ''
+        && (parentName === name || parentName.includes(name))
       if (!echo && (interactive || name.length > 0)) {
         lines.push({ depth, role, name: name.slice(0, 160), ref: interactive ? ref : undefined })
         rendered = true
@@ -152,7 +189,12 @@ export async function snapshotPage(
     }
   }
 
-  const root = nodes.find((node) => (node.role?.value ?? '') === 'RootWebArea') ?? nodes[0]
+  const scoped = scopedBackendId === undefined
+    ? undefined
+    : nodes.find((node) => node.backendDOMNodeId === scopedBackendId)
+  const root = scoped
+    ?? nodes.find((node) => (node.role?.value ?? '') === 'RootWebArea')
+    ?? nodes[0]
   if (root !== undefined) render(root, 0)
 
   // Fold the flat depths into nested bullets, then apply the character cap.

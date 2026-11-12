@@ -107,6 +107,7 @@ ctx.tools.register(defineTool({
     description: 'Read the page as a compact accessibility tree. Each interactive element gets a ref like [ref=e12]; pass that ref to browser_click, browser_type or browser_check. This is the normal way to look at a page: it is exact, cheap, and needs no coordinates.',
     parameters: {
       interactive: { type: 'boolean', description: 'Only actionable elements; defaults to true' },
+      scope: { type: 'string', description: 'CSS selector to read only part of the page, for example main or #content' },
     },
     output: {
       schema: {
@@ -128,7 +129,10 @@ ctx.tools.register(defineTool({
     async execute(args, exec) {
       const session = await claim(exec.agent, exec.signal)
       const active = view(session)
-      const snapshot = await active.snapshot({ interactiveOnly: args.interactive !== false })
+      const snapshot = await active.snapshot({
+        interactiveOnly: args.interactive !== false,
+        ...(args.scope === undefined ? {} : { scope: args.scope }),
+      })
       return {
         url: snapshot.url,
         title: snapshot.title,
@@ -136,6 +140,56 @@ ctx.tools.register(defineTool({
         elements: snapshot.refs.size,
         truncated: snapshot.truncated,
       }
+    },
+  }))
+
+ctx.tools.register(defineTool({
+    name: 'browser_find',
+    description: 'Find elements by role and/or visible text anywhere on the page, and get a ref for each. Use this when the snapshot is truncated or when you know what you are looking for: role "button" name "Submit".',
+    parameters: {
+      role: { type: 'string', description: 'Accessibility role, for example button, link, textbox' },
+      name: { type: 'string', description: 'Case-insensitive part of the visible text' },
+      max: { type: 'number', description: 'Maximum matches to return; defaults to 20' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          matches: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { role: { type: 'string' }, name: { type: 'string' }, ref: { type: 'string' } },
+              additionalProperties: false,
+            },
+          },
+          total: { type: 'number' },
+        },
+        additionalProperties: false,
+      },
+      render: (_args, value) => {
+        const matches = value.matches ?? []
+        const total = value.total ?? matches.length
+        return [{
+          type: 'text',
+          text: matches.length === 0
+            ? 'no element matched'
+            : matches.map((m) => `${m.role} "${m.name}" [ref=${m.ref}]`).join('\n')
+              + (total > matches.length ? `\n(+${total - matches.length} more)` : ''),
+        }]
+      },
+    },
+    async execute(args, exec) {
+      const session = await claim(exec.agent, exec.signal)
+      if (args.role === undefined && args.name === undefined) {
+        throw new Error('give a role, a name, or both')
+      }
+      const result = await view(session).find({
+        ...(args.role === undefined ? {} : { role: args.role }),
+        ...(args.name === undefined ? {} : { name: args.name }),
+        ...(args.max === undefined ? {} : { max: args.max }),
+      })
+      return { matches: result.matches, total: result.total }
     },
   }))
 
