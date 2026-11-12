@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+
+- **`browser_snapshot`: read a page as an accessibility tree with refs.** The
+  agent used to read raw `innerText` and click by CSS selector or coordinates,
+  which meant guessing where something was. `browser_snapshot` returns the
+  compact tree used by agent-browser — `button "Submit" [ref=e12]` — and
+  `browser_click` and `browser_type` accept that ref. A ref is exact, cheap, and
+  re-read after every navigation; a stale ref is refused instead of landing on
+  whatever occupies that spot now.
+- A refused action explains itself: hidden, disabled, or covered by a consent
+  banner, rather than reporting a click that did nothing.
+
+### Changed
+
+- Screenshots are no longer the way to read a page. The tree is the default;
+  `browser_screenshot` remains for visual checks the tree cannot express.
+
 ## 0.2.6
 
 ### Fixed

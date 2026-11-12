@@ -102,10 +102,48 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
     },
   }))
 
+ctx.tools.register(defineTool({
+    name: 'browser_snapshot',
+    description: 'Read the page as a compact accessibility tree. Each interactive element gets a ref like [ref=e12]; pass that ref to browser_click, browser_type or browser_check. This is the normal way to look at a page: it is exact, cheap, and needs no coordinates.',
+    parameters: {
+      interactive: { type: 'boolean', description: 'Only actionable elements; defaults to true' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string' },
+          title: { type: 'string' },
+          tree: { type: 'string' },
+          elements: { type: 'number' },
+          truncated: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: `${value.title}\n${value.url}\n\n${value.tree}${value.truncated ? '\n(tree truncated)' : ''}`,
+      }],
+    },
+    async execute(args, exec) {
+      const session = await claim(exec.agent, exec.signal)
+      const active = view(session)
+      const snapshot = await active.snapshot({ interactiveOnly: args.interactive !== false })
+      return {
+        url: snapshot.url,
+        title: snapshot.title,
+        tree: snapshot.text,
+        elements: snapshot.refs.size,
+        truncated: snapshot.truncated,
+      }
+    },
+  }))
+
   ctx.tools.register(defineTool({
     name: 'browser_click',
-    description: 'Click a CSS-selected element, or a point, in the side-panel browser.',
+    description: 'Click an element from browser_snapshot, or a CSS selector, or a point.',
     parameters: {
+      ref: { type: 'string', description: 'Ref from browser_snapshot, for example e12' },
       selector: { type: 'string', description: 'CSS selector of the element to click' },
       x: { type: 'number', description: 'Page x coordinate, when no selector is given' },
       y: { type: 'number', description: 'Page y coordinate, when no selector is given' },
@@ -125,6 +163,11 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
     async execute(args, exec) {
       const session = await claim(exec.agent, exec.signal)
       const active = view(session)
+      if (args.ref !== undefined) {
+        const result = await active.clickRef(args.ref)
+        const page = await active.readText(400)
+        return { clicked: result.detail || args.ref, url: page.url, title: page.title }
+      }
       if (args.selector !== undefined) {
         const result = await active.clickSelector(args.selector)
         const page = await active.readText(400)
@@ -141,9 +184,10 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
 
   ctx.tools.register(defineTool({
     name: 'browser_type',
-    description: 'Type text into the focused field, or into a CSS-selected field, and optionally press Enter.',
+    description: 'Type text into an element from browser_snapshot, or the focused field, and optionally press Enter.',
     parameters: {
       text: { type: 'string', required: true, description: 'Text to insert' },
+      ref: { type: 'string', description: 'Ref from browser_snapshot, for example e12' },
       selector: { type: 'string', description: 'CSS selector of the field to focus first' },
       submit: { type: 'boolean', description: 'Press Enter after typing' },
     },
@@ -154,7 +198,9 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
     async execute(args, exec) {
       const session = await claim(exec.agent, exec.signal)
       const active = view(session)
-      if (args.selector !== undefined) {
+      if (args.ref !== undefined) {
+        await active.focusRef(args.ref)
+      } else if (args.selector !== undefined) {
         await active.clickSelector(args.selector)
       }
       await active.insertText(args.text)

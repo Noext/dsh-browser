@@ -8,6 +8,8 @@
  * @module dsh-browser/host/view
  */
 import { chromeUserAgent } from './launcher.ts'
+import { resolveClickPoint } from './refs.ts'
+import { snapshotPage, type Snapshot, type SnapshotOptions } from './snapshot.ts'
 import { CdpConnection, type CdpEvent } from './cdp.ts'
 import type { Log } from './log.ts'
 
@@ -59,6 +61,8 @@ export class BrowserView {
   private loading = true
   private viewport: { width: number; height: number }
   private deviceScaleFactor = 1
+  /** Latest snapshot; a ref only means something against the tree it came from. */
+  private lastSnapshot: Snapshot | undefined
   /** Serialises viewport updates: stop/start of the screencast must not interleave. */
   private viewportQueue: Promise<void> = Promise.resolve()
   private disposeEvents: (() => void) | undefined
@@ -295,6 +299,56 @@ export class BrowserView {
       truncated: text.length > maxChars,
     }
   }
+
+  /**
+   * Read the page as a compact accessibility tree with a ref per element.
+   *
+   * The default way an agent should look at a page: a text tree is exact and
+   * cheap, where a screenshot forces the model to guess coordinates.
+   * @param options - filtering and size bounds.
+   * @returns the tree and its ref table.
+   */
+  async snapshot(options?: SnapshotOptions): Promise<Snapshot> {
+    const snapshot = await snapshotPage(this.options.connection, this.sessionId, options)
+    this.lastSnapshot = snapshot
+    return snapshot
+  }
+
+  /**
+   * Click the element a snapshot ref names.
+   *
+   * A refused action throws with the reason, so a click that cannot land never
+   * looks like success.
+   * @param ref - ref such as `e12` from the latest snapshot.
+   * @returns what was clicked.
+   */
+  async clickRef(ref: string): Promise<{ detail: string }> {
+    const nodeId = this.lastSnapshot?.refs.get(ref)
+    if (nodeId === undefined) throw new Error(`unknown ref "${ref}"; take a new browser_snapshot`)
+    const target = await resolveClickPoint(this.options.connection, this.sessionId, nodeId)
+    if ('refusal' in target) throw new Error(`cannot click ${ref}: ${target.detail}`)
+    await this.mouse({ type: 'move', x: target.point.x, y: target.point.y, button: 0, clickCount: 0, modifiers: 0 })
+    await this.mouse({ type: 'down', x: target.point.x, y: target.point.y, button: 0, clickCount: 1, modifiers: 0 })
+    await this.mouse({ type: 'up', x: target.point.x, y: target.point.y, button: 0, clickCount: 1, modifiers: 0 })
+    return { detail: target.detail === '' ? ref : `${target.detail} (${ref})` }
+  }
+
+  /**
+   * Focus the element a snapshot ref names, so a following insert goes into it.
+   * @param ref - ref such as `e12` from the latest snapshot.
+   */
+  async focusRef(ref: string): Promise<void> {
+    const nodeId = this.lastSnapshot?.refs.get(ref)
+    if (nodeId === undefined) throw new Error(`unknown ref "${ref}"; take a new browser_snapshot`)
+    const target = await resolveClickPoint(this.options.connection, this.sessionId, nodeId)
+    if ('refusal' in target) throw new Error(`cannot focus ${ref}: ${target.detail}`)
+    await this.mouse({ type: 'move', x: target.point.x, y: target.point.y, button: 0, clickCount: 0, modifiers: 0 })
+    await this.mouse({ type: 'down', x: target.point.x, y: target.point.y, button: 0, clickCount: 1, modifiers: 0 })
+    await this.mouse({ type: 'up', x: target.point.x, y: target.point.y, button: 0, clickCount: 1, modifiers: 0 })
+  }
+
+  /** The most recent snapshot, whose refs a later action resolves against. */
+  get snapshotState(): Snapshot | undefined { return this.lastSnapshot }
 
   /**
    * Capture the visible page as a PNG.
