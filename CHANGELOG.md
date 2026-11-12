@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.1
+
+### Fixed
+
+- **Clicking a file input opened a native file dialog on the Host display.** The
+  chooser lives outside the browser, so nobody could reach it and it could block
+  the window. The page reports the request instead, and the click fails with a
+  message naming `browser_upload` and the ref to use.
+- A file input is labelled `file-input` in the tree. Chromium reports it as a
+  plain button whose value is the chosen file name, which gave a caller no way
+  to tell it apart from a button it could press.
+
 ## 0.4.0
 
 ### Added

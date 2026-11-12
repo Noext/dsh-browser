@@ -64,6 +64,8 @@ export class BrowserView {
   private deviceScaleFactor = 1
   /** Latest snapshot; a ref only means something against the tree it came from. */
   private lastSnapshot: Snapshot | undefined
+  /** Ref of the input whose native chooser was intercepted, if any. */
+  private pendingFileChooser: string | undefined
   /** Serialises viewport updates: stop/start of the screencast must not interleave. */
   private viewportQueue: Promise<void> = Promise.resolve()
   private disposeEvents: (() => void) | undefined
@@ -94,6 +96,10 @@ export class BrowserView {
     await this.send('Page.enable')
     await this.send('Runtime.enable')
     await this.send('Page.setLifecycleEventsEnabled', { enabled: true })
+    // A file input click would otherwise open a native GTK dialog on the Host
+    // display, where nobody can reach it and it can block the window. Chromium
+    // reports the request instead, and `setFiles` attaches paths directly.
+    await this.send('Page.setInterceptFileChooserDialog', { enabled: true })
     // Identity first: a view rebuilt by an external action must look the same.
     await this.applyChromeIdentity()
     // Keep the mirror honest: emulate a desktop viewport, never a mobile one.
@@ -328,9 +334,17 @@ export class BrowserView {
     if (nodeId === undefined) throw new Error(`unknown ref "${ref}"; take a new browser_snapshot`)
     const target = await resolveClickPoint(this.options.connection, this.sessionId, nodeId)
     if ('refusal' in target) throw new Error(`cannot click ${ref}: ${target.detail}`)
+    this.pendingFileChooser = undefined
     await this.mouse({ type: 'move', x: target.point.x, y: target.point.y, button: 0, clickCount: 0, modifiers: 0 })
     await this.mouse({ type: 'down', x: target.point.x, y: target.point.y, button: 0, clickCount: 1, modifiers: 0 })
     await this.mouse({ type: 'up', x: target.point.x, y: target.point.y, button: 0, clickCount: 1, modifiers: 0 })
+    // A click on a file input asks for a file; say so instead of leaving the
+    // caller wondering why nothing happened.
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    if (this.pendingFileChooser !== undefined) {
+      this.pendingFileChooser = undefined
+      throw new Error(`${ref} opens a file chooser; use browser_upload with this ref and the file paths`)
+    }
     return { detail: target.detail === '' ? ref : `${target.detail} (${ref})` }
   }
 
@@ -693,6 +707,13 @@ export class BrowserView {
             this.options.sink.onNavigation(this, { url, title, loading: false })
           })
           .catch((error: unknown) => { this.log.debug('title read failed', error) })
+        break
+      }
+      case 'Page.fileChooserOpened': {
+        // Remember which input asked, so the caller gets a clear message instead
+        // of a click that silently did nothing.
+        const backend = (params as { backendNodeId?: number }).backendNodeId
+        this.pendingFileChooser = backend === undefined ? undefined : `e${backend}`
         break
       }
       case 'Page.javascriptDialogOpening': {
