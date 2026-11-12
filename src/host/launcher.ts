@@ -218,6 +218,10 @@ function chromeBranding(): string {
 async function stop(child: ChildProcess, profileDir: string): Promise<void> {
   if (child.exitCode === null && child.signalCode === null) {
     const exited = new Promise<void>((resolve) => { child.once('exit', () => { resolve() }) })
+    // SIGTERM alone skips Chromium's shutdown path: cookies and storage stay in
+    // memory, so the next launch finds an empty profile and every login is lost.
+    // Asking the browser to close runs that path, which is what persists them.
+    await requestBrowserClose(profileDir).catch(() => undefined)
     child.kill('SIGTERM')
     const timedOut = await Promise.race([
       exited.then(() => false),
@@ -227,6 +231,8 @@ async function stop(child: ChildProcess, profileDir: string): Promise<void> {
       child.kill('SIGKILL')
       await exited
     }
+    // Give Chromium a moment to finish committing the profile database.
+    await new Promise<void>((resolve) => setTimeout(resolve, 150))
   }
   // Chromium leaves Singleton* links behind when killed; they block the next launch.
   for (const name of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
@@ -284,4 +290,35 @@ function playwrightCandidates(): string[] {
     }
   }
   return found
+}
+/**
+ * Ask Chromium to close through its own protocol.
+ *
+ * A signal kills the process before it commits its profile, so cookies, local
+ * storage and the saved logins never reach disk. This is the difference between
+ * a browser a person can stay signed into and one that forgets every restart.
+ * @param profileDir - the profile whose browser should close.
+ * @returns resolves once the request is delivered or has clearly failed.
+ */
+async function requestBrowserClose(profileDir: string): Promise<void> {
+  const portFile = join(profileDir, 'DevToolsActivePort')
+  if (!existsSync(portFile)) return
+  const port = readFileSync(portFile, 'utf8').split('\n')[0]?.trim()
+  if (port === undefined || port === '') return
+  const version = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(1000) })
+  if (!version.ok) return
+  const info = (await version.json()) as { webSocketDebuggerUrl?: string }
+  if (info.webSocketDebuggerUrl === undefined) return
+  const socket = new WebSocket(info.webSocketDebuggerUrl)
+  await new Promise<void>((resolve, reject) => {
+    const done = (): void => { try { socket.close() } catch { /* already closed */ } resolve() }
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ id: 1, method: 'Browser.close', params: {} }))
+      // The socket closes as the browser exits; either answer is success.
+      setTimeout(done, 2000)
+    })
+    socket.addEventListener('error', reject)
+    socket.addEventListener('close', done)
+    setTimeout(done, 2500)
+  })
 }

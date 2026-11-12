@@ -7,13 +7,14 @@
  * @module dsh-browser/host/profiles
  */
 import { createHash } from 'node:crypto'
-import { mkdirSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 /** What a profile owner looks like to this module. */
 export interface ProfileOwner {
   readonly id: string
+  /** The Session's working directory, when the composition provides one. */
   readonly workspace?: { readonly cwd?: string }
 }
 
@@ -25,7 +26,18 @@ export interface ProfileOptions {
   readonly root?: string
 }
 
-/** Resolve and create per-Session profile directories. */
+/**
+ * Key used when a deployment names no working directory.
+ *
+ * It must be stable across Sessions and restarts. The session id is the opposite
+ * of stable: it changes with every new conversation, so keying on it gave each
+ * Session an empty profile and silently discarded every cookie and login. One
+ * shared profile is the honest default for a deployment that cannot name a
+ * workspace, and it matches how a person expects "the browser" to behave.
+ */
+const FALLBACK_KEY = 'dsh-browser-default-profile'
+
+/** Resolve and create per-owner profile directories. */
 export function createProfiles(options: ProfileOptions) {
   const root = options.root ?? defaultRoot(options.persistent)
   /** Directories handed out, so a clear affects exactly what this Host created. */
@@ -39,10 +51,13 @@ export function createProfiles(options: ProfileOptions) {
      * @returns an existing, 0700 directory.
      */
     directoryFor(owner: ProfileOwner): string {
-      const key = owner.workspace?.cwd ?? owner.id
+      const key = owner.workspace?.cwd ?? FALLBACK_KEY
       const digest = createHash('sha256').update(`${key}\u0000${options.persistent ? 'p' : 'e'}`).digest('hex').slice(0, 16)
       const directory = join(root, digest)
       mkdirSync(directory, { recursive: true, mode: 0o700 })
+      // Adopt a profile written before this key became stable, so a sign-in that
+      // already happened is not thrown away by the rename.
+      adoptLegacyProfile(root, directory)
       const forOwner = issued.get(owner.id) ?? new Set<string>()
       forOwner.add(directory)
       issued.set(owner.id, forOwner)
@@ -63,6 +78,39 @@ export function createProfiles(options: ProfileOptions) {
       rmSync(root, { recursive: true, force: true })
       issued.clear()
     },
+  }
+}
+
+/**
+ * Copy a legacy session-keyed profile into the stable directory.
+ *
+ * Releases before 0.4.2 keyed the profile on the session id, so a login was
+ * stored under a directory nothing would ever look at again. Copying it forward
+ * once is what keeps an existing sign-in usable instead of asking for it again.
+ * @param root - the profile root.
+ * @param target - the stable directory for this workspace or deployment.
+ */
+function adoptLegacyProfile(root: string, target: string): void {
+  if (existsSync(join(target, 'chromium'))) return
+  const marker = join(target, '.adopted')
+  if (existsSync(marker)) return
+  let entries: string[]
+  try {
+    entries = readdirSync(root)
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    const candidate = join(root, entry)
+    if (candidate === target) continue
+    if (!existsSync(join(candidate, 'chromium'))) continue
+    try {
+      cpSync(candidate, target, { recursive: true })
+      writeFileSync(marker, 'adopted\n')
+    } catch {
+      // A failed copy leaves the target empty, which is no worse than before.
+    }
+    return
   }
 }
 

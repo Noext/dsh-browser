@@ -520,6 +520,35 @@ export class BrowserView {
   }
 
   /**
+   * Write one cookie into this page's jar.
+   * @param cookie - name, value, and the URL it belongs to.
+   */
+  async setCookie(cookie: {
+    name: string
+    value: string
+    url?: string
+    domain?: string
+    path?: string
+    expires?: number
+  }): Promise<void> {
+    await this.options.connection.send('Network.enable', {}, this.sessionId)
+    await this.options.connection.send('Network.setCookie', cookie as Record<string, unknown>, this.sessionId)
+  }
+
+  /**
+   * Read one cookie by name, which is how a caller confirms a session survived.
+   * @param name - the cookie to look for.
+   * @returns the cookie, or undefined when the jar does not have it.
+   */
+  async getCookie(name: string): Promise<{ name: string; value: string } | undefined> {
+    await this.options.connection.send('Network.enable', {}, this.sessionId)
+    const all = await this.options.connection.send<{ cookies?: { name: string; value: string }[] }>(
+      'Network.getCookies', {}, this.sessionId,
+    )
+    return (all.cookies ?? []).find((cookie) => cookie.name === name)
+  }
+
+  /**
    * Wait until the page settles or a condition holds.
    *
    * A navigation returns before the page is usable, so an agent that acts

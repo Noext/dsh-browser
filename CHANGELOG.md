@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.2
+
+### Fixed
+
+- **Every login and cookie was lost on the next Session.** Two independent
+  defects, both silent:
+  1. The profile directory was keyed on the Session id when the deployment names
+     no workspace, and a Session id changes with every conversation. Each new
+     Session therefore opened an empty profile. The fallback key is now stable,
+     and a profile written under the old scheme is copied forward once, so an
+     existing sign-in keeps working instead of asking again.
+  2. The browser was stopped with a signal, which kills Chromium before it
+     commits its profile: cookies and storage stayed in memory and never reached
+     disk. The browser is now asked to close through its own protocol, and only
+     then signalled if it ignores the request.
+
+- `tests/profile-persistence.ts` writes a cookie, ends the Session, and requires
+  a new Session to still see it.
+
 ## 0.4.1
 
 ### Fixed
