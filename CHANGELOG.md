@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.4
+
+### Fixed
+
+- **Every browser tool was missing after an upgrade.** The tool definitions set
+  `required` inside their output schemas, and DSH's value-schema DSL accepts
+  `required` only in parameter schemas. `defineTool` threw on the first
+  definition, which aborted `registerTools` and silently dropped all nine tools,
+  so the agent had no `browser_open` and the sidebar still worked. The output
+  schemas no longer declare it; `tests/live-tools.mjs` now registers the real
+  definitions against a real `ToolsService` and fails if any tool is lost.
+- **Google refused to sign in.** Headless Chromium reports `HeadlessChrome` in
+  its User-Agent, which Google answers with "this browser or app may not be
+  secure". Headless now presents the matching Chrome User-Agent;
+  `tests/google-signin.mjs` checks both modes against the live sign-in page.
+
 ## 0.2.3
 
 ### Fixed

@@ -63,7 +63,6 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
           text: { type: 'string' },
           truncated: { type: 'boolean' },
         },
-        required: ['url', 'title', 'text', 'truncated'],
         additionalProperties: false,
       },
       render: (_args, value) => [{ type: 'text', text: `${value.title}\n${value.url}\n\n${value.text}` }],
@@ -92,7 +91,6 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
           text: { type: 'string' },
           truncated: { type: 'boolean' },
         },
-        required: ['url', 'title', 'text', 'truncated'],
         additionalProperties: false,
       },
       render: (_args, value) => [{ type: 'text', text: `${value.title}\n${value.url}\n\n${value.text}` }],
@@ -120,7 +118,6 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
           url: { type: 'string' },
           title: { type: 'string' },
         },
-        required: ['clicked', 'url', 'title'],
         additionalProperties: false,
       },
       render: (_args, value) => [{ type: 'text', text: `clicked ${value.clicked} → ${value.url}` }],
@@ -151,7 +148,7 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
       submit: { type: 'boolean', description: 'Press Enter after typing' },
     },
     output: {
-      schema: { type: 'object', properties: { typed: { type: 'boolean' } }, required: ['typed'], additionalProperties: false },
+      schema: { type: 'object', properties: { typed: { type: 'boolean' } }, additionalProperties: false },
       render: (_args, value) => [{ type: 'text', text: value.typed ? 'typed' : 'nothing typed' }],
     },
     async execute(args, exec) {
@@ -176,7 +173,7 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
       key: { type: 'string', required: true, description: 'DOM key value, for example Enter or ArrowDown' },
     },
     output: {
-      schema: { type: 'object', properties: { pressed: { type: 'string' } }, required: ['pressed'], additionalProperties: false },
+      schema: { type: 'object', properties: { pressed: { type: 'string' } }, additionalProperties: false },
       render: (_args, value) => [{ type: 'text', text: `pressed ${value.pressed}` }],
     },
     async execute(args, exec) {
@@ -197,7 +194,6 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
       schema: {
         type: 'object',
         properties: { mediaType: { type: 'string' }, bytes: { type: 'number' }, width: { type: 'number' }, height: { type: 'number' }, url: { type: 'string' } },
-        required: ['mediaType', 'bytes', 'width', 'height', 'url'],
         additionalProperties: false,
       },
       render: (_args, value) => [{ type: 'text', text: `captured ${value.width}×${value.height} PNG of ${value.url}` }],
@@ -232,13 +228,11 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
             items: {
               type: 'object',
               properties: { viewId: { type: 'string' }, url: { type: 'string' }, title: { type: 'string' } },
-              required: ['viewId', 'url', 'title'],
               additionalProperties: false,
             },
           },
           activeViewId: { type: 'string' },
         },
-        required: ['views'],
         additionalProperties: false,
       },
       render: (_args, value) => [{
@@ -274,7 +268,7 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
       action: { type: 'string', enum: ['back', 'forward', 'reload'], required: true },
     },
     output: {
-      schema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'], additionalProperties: false },
+      schema: { type: 'object', properties: { url: { type: 'string' } }, additionalProperties: false },
       render: (_args, value) => [{ type: 'text', text: `now at ${value.url}` }],
     },
     async execute(args, exec) {
@@ -303,7 +297,6 @@ export function registerTools(ctx: Context, deps: ToolDeps): void {
           url: { type: 'string' },
           title: { type: 'string' },
         },
-        required: ['outcome', 'url', 'title'],
         additionalProperties: false,
       },
       render: (_args, value) => [{
