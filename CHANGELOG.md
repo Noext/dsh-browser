@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.5
+
+### Fixed
+
+- **A browser that died left the session claiming it was healthy.** Nothing
+  observed the CDP socket ending, so `ensureStarted` kept answering "ready" and
+  every tool failed with "the browser connection closed" until the Host was
+  restarted. The connection now reports its own end, the session resets to a
+  retryable failure, and the next call launches a fresh browser with a new tab.
+  `tests/connection-loss.ts` kills Chromium from outside and requires the session
+  to recover and run a command again.
+
 ## 0.2.4
 
 ### Fixed

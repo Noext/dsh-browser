@@ -170,8 +170,18 @@ export class BrowserSession {
    */
   async ensureStarted(signal?: AbortSignal): Promise<void> {
     if (this.disposed) throw new Error('the browser session has been disposed')
-    if (this.state === 'ready') return
-    if (this.state === 'failed') throw new Error(this.failure ?? 'the browser session failed to start')
+    if (this.state === 'ready') {
+      // A connection that died since the last check is not usable; fall through
+      // so a fresh browser is launched instead of trusting stale state.
+      if (this.connection !== undefined && this.connection.open) return
+      this.handleConnectionLost(new Error('the browser connection is no longer open'))
+    }
+    // A failed attempt is retryable: the next call starts a new browser, which is
+    // what a crashed or externally closed Chromium needs.
+    if (this.state === 'failed') {
+      this.state = 'starting'
+      this.failure = undefined
+    }
     if (this.starting === undefined) this.starting = this.start()
     return await withSignal(this.starting, signal)
   }
@@ -311,6 +321,27 @@ export class BrowserSession {
   }
 
   /**
+   * React to the browser connection ending.
+   *
+   * Every view is gone with it, and `state` must stop claiming "ready": the
+   * next `ensureStarted` relaunches Chromium rather than answering from a dead
+   * session. A dispose already in progress is left alone.
+   * @param error - why the connection ended.
+   */
+  private handleConnectionLost(error: Error): void {
+    if (this.disposed || this.state === 'closed') return
+    this.options.log.warn('the browser connection closed', error)
+    this.state = 'failed'
+    this.failure = 'the browser connection closed; the next call starts a new browser'
+    this.connection = undefined
+    this.views.clear()
+    this.activeViewId = undefined
+    this.starting = undefined
+    // A failed start is retryable: clearing it lets the next call relaunch.
+    this.options.sink.onViews(this)
+  }
+
+  /**
    * Reclaim a browser nobody is watching.
    *
    * A viewer that stops existing (a closed tab, a closed browser window, a
@@ -372,6 +403,10 @@ export class BrowserSession {
       this.options.log.info(`browser started: ${launch.version} on port ${launch.port}`)
       const { connection } = await connectCdp(launch.webSocketDebuggerUrl)
       this.connection = connection
+      // The browser can die while this session believes it is healthy. Reset the
+      // state so the next caller launches a fresh browser instead of sending
+      // commands into a closed socket.
+      connection.onClose((error) => { this.handleConnectionLost(error) })
       connection.onEvent((event: CdpEvent) => {
         if (event.method === 'Target.targetDestroyed') {
           const targetId = event.params?.targetId
@@ -381,15 +416,17 @@ export class BrowserSession {
       })
       this.state = 'ready'
       this.startIdleWatch()
-      // No tab is created here: the viewer that triggered this start creates the
-      // first one, and a tool call creates one when no viewer exists. Creating
-      // one eagerly left every session with an empty second tab.
+      // One tab per browser, created here so a recovered session is usable at
+      // once. `attachViewer` reuses it, so this does not open a second one.
+      await this.createView(this.options.initialUrl)
     } catch (error) {
       this.state = 'failed'
       this.failure = error instanceof Error ? error.message : String(error)
       if (error instanceof Error && 'hint' in error && typeof error.hint === 'string') {
         this.failure = `${this.failure} — ${error.hint}`
       }
+      // Drop the cached attempt: a failed start must be retryable.
+      this.starting = undefined
       this.options.log.error('browser session failed to start', error)
       this.options.sink.onError(this, error instanceof Error ? error : new Error(String(error)))
       await this.dispose('startup failed').catch(() => {})

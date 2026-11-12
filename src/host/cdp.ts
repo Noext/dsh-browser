@@ -54,6 +54,8 @@ export class CdpConnection {
   private nextId = 1
   private readonly pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; method: string }>()
   private readonly listeners = new Set<(event: CdpEvent) => void>()
+  private readonly closeListeners = new Set<(error: Error) => void>()
+  private closeError: Error | undefined
   private closed = false
   private readonly transport: CdpTransport
 
@@ -83,6 +85,25 @@ export class CdpConnection {
       this.pending.set(id, { resolve, reject, method })
       this.transport.send(JSON.stringify(sessionId === undefined ? { id, method, params } : { id, method, params, sessionId }))
     })
+  }
+
+  /**
+   * Observe the connection ending.
+   *
+   * A browser can vanish under a live command — a crash, a closed window, an
+   * external kill. Owners need to learn about that to reset their own state;
+   * without it a session keeps reporting "ready" and every later command fails
+   * against a dead socket.
+   * @param listener - called once with the cause, immediately if already closed.
+   * @returns an unsubscribe function.
+   */
+  onClose(listener: (error: Error) => void): () => void {
+    if (this.closeError !== undefined) {
+      listener(this.closeError)
+      return () => {}
+    }
+    this.closeListeners.add(listener)
+    return () => { this.closeListeners.delete(listener) }
   }
 
   /**
@@ -127,10 +148,17 @@ export class CdpConnection {
   }
 
   private failAll(error: Error): void {
+    if (this.closed && this.closeError !== undefined) return
     this.closed = true
+    this.closeError = error
     const entries = [...this.pending.values()]
     this.pending.clear()
     for (const entry of entries) entry.reject(error)
+    const closeListeners = [...this.closeListeners]
+    this.closeListeners.clear()
+    for (const listener of closeListeners) {
+      try { listener(error) } catch { /* an observer must not break the others */ }
+    }
   }
 }
 
